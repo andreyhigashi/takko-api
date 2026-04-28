@@ -1,112 +1,63 @@
+require('dotenv').config();
+
 const express = require('express');
-const fs = require('fs');
-const path = require('path');
+const cors = require('cors');
+const { createClient } = require('@supabase/supabase-js');
 
 const app = express();
-const anunciosPath = path.join(__dirname, 'anuncios.json');
-
+app.use(cors());
 app.use(express.json());
-app.use((req, res, next) => {
-  res.header('Access-Control-Allow-Origin', '*');
-  res.header('Access-Control-Allow-Methods', 'GET,POST');
-  res.header('Access-Control-Allow-Headers', 'Content-Type');
 
-  if (req.method === 'OPTIONS') {
-    return res.sendStatus(204);
+// 🔑 Variáveis de ambiente
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_ANON_KEY;
+
+if (!supabaseUrl || !supabaseKey) {
+  throw new Error('Configure SUPABASE_URL e SUPABASE_ANON_KEY no .env');
+}
+
+// 🔌 Cliente Supabase
+const supabase = createClient(supabaseUrl, supabaseKey);
+
+// 🟢 GET - listar anúncios
+app.get('/anuncios', async (req, res) => {
+  const { data, error } = await supabase
+    .from('anuncios')
+    .select('*')
+    .order('id', { ascending: false });
+
+  if (error) {
+    console.log("SUPABASE SELECT ERROR:", error);
+    return res.status(500).json({ error: error.message });
   }
 
-  next();
+  res.json(data);
 });
 
-function carregarAnuncios() {
-  if (!fs.existsSync(anunciosPath)) {
-    return [];
-  }
-
-  try {
-    const conteudo = fs.readFileSync(anunciosPath, 'utf8');
-    const dados = JSON.parse(conteudo);
-    if (Array.isArray(dados)) {
-      const { anunciosNormalizados, alterado } = atribuirIdsAusentes(dados);
-      if (alterado) {
-        salvarAnuncios(anunciosNormalizados);
-      }
-      return anunciosNormalizados;
-    }
-
-    return [];
-  } catch (error) {
-    console.error('Erro ao carregar anuncios.json:', error.message);
-    return [];
-  }
-}
-
-function salvarAnuncios(anuncios) {
-  fs.writeFileSync(anunciosPath, JSON.stringify(anuncios, null, 2), 'utf8');
-}
-
-function obterProximoId(anuncios) {
-  const maiorId = anuncios.reduce((maior, anuncio) => {
-    return Number.isInteger(anuncio.id) && anuncio.id > maior ? anuncio.id : maior;
-  }, 0);
-
-  return maiorId + 1;
-}
-
-function atribuirIdsAusentes(anuncios) {
-  let proximoId = obterProximoId(anuncios);
-  let alterado = false;
-
-  const anunciosNormalizados = anuncios.map((anuncio) => {
-    if (Number.isInteger(anuncio.id)) {
-      return anuncio;
-    }
-
-    alterado = true;
-    return {
-      id: proximoId++,
-      ...anuncio,
-    };
-  });
-
-  return { anunciosNormalizados, alterado };
-}
-
-let anuncios = carregarAnuncios();
-
-// GET
-app.get('/anuncios', (req, res) => {
-  res.json(anuncios);
-});
-
-app.get('/anuncios/:id', (req, res) => {
-  const id = Number(req.params.id);
-  const anuncio = anuncios.find((item) => item.id === id);
-
-  if (!anuncio) {
-    return res.status(404).json({ error: 'Anuncio nao encontrado' });
-  }
-
-  res.json(anuncio);
-});
-
-// POST
-app.post('/anuncios', (req, res) => {
+// 🟢 POST - criar anúncio
+app.post('/anuncios', async (req, res) => {
   const { titulo, preco, cidade } = req.body;
 
-  const novoAnuncio = {
-    id: obterProximoId(anuncios),
-    titulo,
-    preco,
-    cidade,
-  };
+  // validação básica
+  if (!titulo || !preco || !cidade) {
+    return res.status(400).json({ error: 'Dados incompletos' });
+  }
 
-  anuncios.push(novoAnuncio);
-  salvarAnuncios(anuncios);
+  const { data, error } = await supabase
+    .from('anuncios')
+    .insert([{ titulo, preco, cidade }])
+    .select();
 
-  res.json({ message: "ok" });
+  if (error) {
+    console.log("SUPABASE INSERT ERROR:", error);
+    return res.status(500).json({ error: error.message });
+  }
+
+  res.json(data[0]);
 });
 
-app.listen(3000, () => {
-  console.log('Servidor rodando na porta 3000');
+// 🚀 iniciar servidor
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log(`Servidor rodando na porta ${PORT}`);
 });
