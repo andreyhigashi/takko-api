@@ -36,7 +36,8 @@ app.get('/anuncios', async (req, res) => {
 
 // 🟢 POST - criar anúncio
 app.post('/anuncios', async (req, res) => {
-  const { titulo, preco, cidade } = req.body;
+  console.log("BODY:", req.body);
+  const { titulo, preco, cidade, whatsapp } = req.body;
 
   // validação básica
   if (!titulo || !preco || !cidade) {
@@ -45,7 +46,7 @@ app.post('/anuncios', async (req, res) => {
 
   const { data, error } = await supabase
     .from('anuncios')
-    .insert([{ titulo, preco, cidade }])
+    .insert([{ titulo, preco, cidade, whatsapp }])
     .select();
 
   if (error) {
