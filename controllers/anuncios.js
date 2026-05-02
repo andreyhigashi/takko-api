@@ -34,7 +34,7 @@ async function buscarAnuncio(req, res) {
 }
 
 async function criarAnuncio(req, res) {
-  const { titulo, preco, cidade, whatsapp, imagem_url } = req.body;
+  const { titulo, preco, cidade, whatsapp, imagem_url, descricao } = req.body;
 
   if (!titulo || !preco || !cidade) {
     return res.status(400).json({ error: 'titulo, preco e cidade são obrigatórios' });
@@ -42,7 +42,7 @@ async function criarAnuncio(req, res) {
 
   const { data, error } = await supabase
     .from('anuncios')
-    .insert([{ titulo, preco, cidade, whatsapp, imagem_url, user_id: req.user.id }])
+    .insert([{ titulo, preco, cidade, whatsapp, imagem_url, descricao, user_id: req.user.id }])
     .select()
     .single();
 
