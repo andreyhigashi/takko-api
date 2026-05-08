@@ -39,6 +39,8 @@ async function buscarAnuncio(req, res) {
 async function criarAnuncio(req, res) {
   const { titulo, preco, cidade, whatsapp, imagens, descricao } = req.body;
 
+  console.log('[criarAnuncio] body:', JSON.stringify({ titulo, preco, cidade, whatsapp, descricao, imagens_count: Array.isArray(imagens) ? imagens.length : imagens }), '| user:', req.user?.id);
+
   if (!titulo || !preco || !cidade) {
     return res.status(400).json({ error: 'titulo, preco e cidade são obrigatórios' });
   }
@@ -51,7 +53,11 @@ async function criarAnuncio(req, res) {
     .select()
     .single();
 
-  if (error) return res.status(500).json({ error: error.message });
+  if (error) {
+    console.error('[criarAnuncio] db error:', error.message, '| user:', req.user?.id);
+    return res.status(500).json({ error: error.message });
+  }
+  console.log('[criarAnuncio] created id:', data.id, '| user:', req.user?.id);
   res.status(201).json(data);
 }
 

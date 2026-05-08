@@ -15,9 +15,13 @@ async function uploadImagem(req, res) {
       upsert: false,
     });
 
-  if (error) return res.status(500).json({ error: error.message });
+  if (error) {
+    console.error('[upload] storage error:', error.message, '| user:', req.user?.id, '| file:', filename);
+    return res.status(500).json({ error: error.message });
+  }
 
   const { data } = supabase.storage.from('imagens').getPublicUrl(filename);
+  console.log('[upload] ok:', filename, '| user:', req.user?.id);
   res.status(201).json({ url: data.publicUrl });
 }
 
