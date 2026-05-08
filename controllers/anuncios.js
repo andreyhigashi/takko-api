@@ -79,6 +79,38 @@ async function deletarAnuncio(req, res) {
   res.status(204).send();
 }
 
+async function editarAnuncio(req, res) {
+  const { id } = req.params;
+  const { titulo, preco, cidade, whatsapp, imagens, descricao } = req.body;
+
+  const { data: anuncio, error: fetchError } = await supabase
+    .from('anuncios')
+    .select('user_id')
+    .eq('id', id)
+    .single();
+
+  if (fetchError) return res.status(404).json({ error: 'Anúncio não encontrado' });
+  if (anuncio.user_id !== req.user.id) return res.status(403).json({ error: 'Sem permissão' });
+
+  const updates = {};
+  if (titulo !== undefined) updates.titulo = titulo;
+  if (preco !== undefined) updates.preco = preco;
+  if (cidade !== undefined) updates.cidade = cidade;
+  if (whatsapp !== undefined) updates.whatsapp = whatsapp;
+  if (imagens !== undefined) updates.imagens = Array.isArray(imagens) ? imagens : [];
+  if (descricao !== undefined) updates.descricao = descricao;
+
+  const { data, error } = await supabase
+    .from('anuncios')
+    .update(updates)
+    .eq('id', id)
+    .select()
+    .single();
+
+  if (error) return res.status(500).json({ error: error.message });
+  res.json(data);
+}
+
 async function marcarVendido(req, res) {
   const { id } = req.params;
 
@@ -100,4 +132,4 @@ async function marcarVendido(req, res) {
   res.json({ success: true });
 }
 
-module.exports = { listarAnuncios, buscarAnuncio, criarAnuncio, deletarAnuncio, marcarVendido };
+module.exports = { listarAnuncios, buscarAnuncio, criarAnuncio, editarAnuncio, deletarAnuncio, marcarVendido };
