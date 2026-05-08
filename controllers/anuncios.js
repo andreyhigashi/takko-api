@@ -8,6 +8,9 @@ async function listarAnuncios(req, res) {
     .select('*')
     .order('id', { ascending: false });
 
+  // feed público esconde vendidos; dono vê tudo
+  if (!user_id) query = query.neq('status', 'vendido');
+
   if (busca) query = query.ilike('titulo', `%${busca}%`);
   if (cidade) query = query.ilike('cidade', `%${cidade}%`);
   if (preco_min) query = query.gte('preco', Number(preco_min));
@@ -70,4 +73,25 @@ async function deletarAnuncio(req, res) {
   res.status(204).send();
 }
 
-module.exports = { listarAnuncios, buscarAnuncio, criarAnuncio, deletarAnuncio };
+async function marcarVendido(req, res) {
+  const { id } = req.params;
+
+  const { data: anuncio, error: fetchError } = await supabase
+    .from('anuncios')
+    .select('user_id')
+    .eq('id', id)
+    .single();
+
+  if (fetchError) return res.status(404).json({ error: 'Anúncio não encontrado' });
+  if (anuncio.user_id !== req.user.id) return res.status(403).json({ error: 'Sem permissão' });
+
+  const { error } = await supabase
+    .from('anuncios')
+    .update({ status: 'vendido' })
+    .eq('id', id);
+
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ success: true });
+}
+
+module.exports = { listarAnuncios, buscarAnuncio, criarAnuncio, deletarAnuncio, marcarVendido };
