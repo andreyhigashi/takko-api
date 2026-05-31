@@ -8,7 +8,7 @@ const supabase = require('../supabase')
 // ─────────────────────────────────────────
 router.get('/', async (req, res) => {
   try {
-    const { categoria, condicao, estado_uf, preco_min, preco_max, busca } = req.query
+    const { categoria, condicao, estado_uf, preco_min, preco_max, busca, whatsapp } = req.query
 
     let query = supabase
       .from('anuncios')
@@ -22,6 +22,7 @@ router.get('/', async (req, res) => {
     if (preco_min) query = query.gte('preco', parseFloat(preco_min))
     if (preco_max) query = query.lte('preco', parseFloat(preco_max))
     if (busca) query = query.ilike('titulo', `%${busca}%`)
+    if (whatsapp) query = query.eq('whatsapp', whatsapp)
 
     const { data, error } = await query
 
