@@ -132,4 +132,37 @@ router.post('/', async (req, res) => {
   }
 })
 
+// ─────────────────────────────────────────
+// POST /anuncios/:id/reportar-vendido
+// Qualquer visitante pode reportar que um item parece vendido
+// ─────────────────────────────────────────
+router.post('/:id/reportar-vendido', async (req, res) => {
+  try {
+    const { data: anuncio, error: fetchError } = await supabase
+      .from('anuncios')
+      .select('id, status, reportes_vendido')
+      .eq('id', req.params.id)
+      .single()
+
+    if (fetchError || !anuncio) {
+      return res.status(404).json({ success: false, message: 'Anúncio não encontrado' })
+    }
+
+    if (anuncio.status === 'vendido') {
+      return res.json({ success: true, message: 'Anúncio já está marcado como vendido' })
+    }
+
+    const { error } = await supabase
+      .from('anuncios')
+      .update({ reportes_vendido: (anuncio.reportes_vendido || 0) + 1 })
+      .eq('id', req.params.id)
+
+    if (error) throw error
+
+    res.json({ success: true, message: 'Report registrado. Obrigado!' })
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message })
+  }
+})
+
 module.exports = router
