@@ -148,6 +148,27 @@ router.put('/anuncios/:id/pausar', adminAuth, async (req, res) => {
 })
 
 // ─────────────────────────────────────────
+// PUT /admin/anuncios/:id/vendido
+// Marca anúncio como vendido
+// ─────────────────────────────────────────
+router.put('/anuncios/:id/vendido', adminAuth, async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from('anuncios')
+      .update({ status: 'vendido' })
+      .eq('id', req.params.id)
+      .select()
+      .single()
+
+    if (error) throw error
+
+    res.json({ success: true, message: 'Anúncio marcado como vendido.', data })
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message })
+  }
+})
+
+// ─────────────────────────────────────────
 // DELETE /admin/anuncios/:id
 // Remove anúncio permanentemente
 // ─────────────────────────────────────────
