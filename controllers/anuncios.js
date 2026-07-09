@@ -47,9 +47,19 @@ async function criarAnuncio(req, res) {
 
   const imagensArray = Array.isArray(imagens) ? imagens : [];
 
+  const meta = req.user.user_metadata || {};
+  const { utm_source, utm_medium, utm_campaign, utm_content, utm_term } = meta;
+
   const { data, error } = await supabase
     .from('anuncios')
-    .insert([{ titulo, preco, cidade, whatsapp, imagens: imagensArray, descricao, user_id: req.user.id }])
+    .insert([{
+      titulo, preco, cidade, whatsapp, imagens: imagensArray, descricao, user_id: req.user.id,
+      utm_source: utm_source || null,
+      utm_medium: utm_medium || null,
+      utm_campaign: utm_campaign || null,
+      utm_content: utm_content || null,
+      utm_term: utm_term || null,
+    }])
     .select()
     .single();
 
