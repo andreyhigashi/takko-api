@@ -1,0 +1,43 @@
+name: Agente de Marketing
+
+on:
+  schedule:
+    - cron: '0 8 * * *'  # 5h BRT (UTC-3) = 8h UTC
+  workflow_dispatch:      # permite rodar manualmente pelo GitHub
+
+jobs:
+  marketing:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Instalar dependências
+        run: npm install
+
+      - name: Rodar agente de marketing
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          WHATSAPP_NUMBER: ${{ secrets.WHATSAPP_NUMBER }}
+          CALLMEBOT_API_KEY: ${{ secrets.CALLMEBOT_API_KEY }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: node agents/marketing.js
+
+      - name: Publicar dashboard no GitHub Pages
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add docs/marketing.html
+          git diff --staged --quiet || git commit -m "chore: atualiza dashboard de marketing $(date -u +'%Y-%m-%d')"
+          git push
