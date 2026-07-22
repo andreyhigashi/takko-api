@@ -45,7 +45,7 @@ async function getApprovedListings(days = 7) {
   const { data, error } = await supabase
     .from('anuncios')
     .select('id, titulo, preco, created_at')
-    .eq('status', 'aprovado')
+    .eq('status', 'ativo')
     .gte('created_at', since.toISOString())
     .order('created_at', { ascending: false })
 
@@ -57,7 +57,7 @@ async function getTotalAnuncios() {
   const { count, error } = await supabase
     .from('anuncios')
     .select('id', { count: 'exact', head: true })
-    .eq('status', 'aprovado')
+    .eq('status', 'ativo')
 
   if (error) throw new Error(`Supabase getTotalAnuncios: ${error.message}`)
   return count || 0
