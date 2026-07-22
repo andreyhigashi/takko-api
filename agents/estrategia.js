@@ -7,7 +7,7 @@ const { getFunnelEvents, getInstagramClicks, getApprovedListings, getTotalAnunci
 const { getDias, processFunnelByDay, calcTotals } = require('./lib/processar-funil')
 const { gerarAnaliseEstrategia } = require('./lib/claude')
 const { gerarHTMLEstrategia } = require('./lib/gerar-html')
-const { sendWhatsApp } = require('./lib/whatsapp')
+const { sendEmail } = require('./lib/email')
 
 const TZ = 'America/Sao_Paulo'
 const REPO = process.env.GITHUB_REPOSITORY || 'andreyhigashi/takko-api'
@@ -67,31 +67,33 @@ async function main() {
   const decisaoMatch = analise.match(/DECISÃO DA SEMANA:\s*([\s\S]+?)(?:\n\n|$)/)
   const decisao = decisaoMatch ? decisaoMatch[1].trim().replace(/\n/g, ' ') : 'Ver dashboard completo'
 
-  const mensagem = `🔭 *TAKKO FISHING — ESTRATÉGIA*
+  const resumo = `🔭 TAKKO FISHING — ESTRATÉGIA
 ${diasDados}
 
-*Funil da semana:*
+FUNIL DA SEMANA:
 • Sessões: ${totals['LandingVisit'] || 0}
 • Cadastros completos: ${totals['SignupCompleted'] || 0}
 • Anúncios publicados: ${totals['ListingPublished'] || 0}
 • Conv. geral (sessão→pub): ${convGeral}%
 
-*Orgânico:* ${instagramClicks} cliques Instagram
-*Total anúncios ativos:* ${totalAnuncios}
+Orgânico: ${instagramClicks} cliques Instagram
+Total anúncios ativos: ${totalAnuncios}
 
-⚡ *Decisão da semana:*
-${decisao}
+⚡ DECISÃO DA SEMANA:
+${decisao}`
 
-🔗 Análise completa:
-${PAGES_URL}/estrategia.html`
-
-  // 7. Enviar WhatsApp
-  console.log('📱 Enviando WhatsApp...')
+  // 7. Enviar email
+  console.log('📧 Enviando email...')
   try {
-    await sendWhatsApp(mensagem)
-    console.log('✅ WhatsApp enviado')
+    await sendEmail({
+      subject: `🔭 Estratégia Takko — ${diasDados}`,
+      resumo,
+      dashboardHtml: html,
+      dashboardUrl: `${PAGES_URL}/estrategia.html`,
+    })
+    console.log('✅ Email enviado')
   } catch (err) {
-    console.error('Erro WhatsApp:', err.message)
+    console.error('Erro email:', err.message)
   }
 
   console.log('✅ Agente de Estratégia concluído')

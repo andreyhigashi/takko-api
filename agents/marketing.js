@@ -7,7 +7,7 @@ const { getFunnelEvents, getInstagramClicks, getApprovedListings, getTotalAnunci
 const { getDias, processFunnelByDay, calcTotals, detectAnomalias } = require('./lib/processar-funil')
 const { gerarInsightsMarketing } = require('./lib/claude')
 const { gerarHTMLMarketing } = require('./lib/gerar-html')
-const { sendWhatsApp } = require('./lib/whatsapp')
+const { sendEmail } = require('./lib/email')
 
 const TZ = 'America/Sao_Paulo'
 const REPO = process.env.GITHUB_REPOSITORY || 'andreyhigashi/takko-api'
@@ -70,33 +70,35 @@ async function main() {
     ? anomalias.map(a => `⚠️ ${a.etapa} ${a.direcao} ${Math.abs(a.delta)}%`).join('\n')
     : '✅ Sem anomalias'
 
-  const mensagem = `📊 *TAKKO FISHING — MARKETING*
+  const resumo = `📊 TAKKO FISHING — MARKETING
 ${dataGeracao} · Últimos 7 dias
 
-*Funil:*
+FUNIL:
 • Sessões (M3): ${totals['LandingVisit'] || 0}
 • CTA Click (P2): ${totals['CTA_Click'] || 0} (conv: ${convP1P2}%)
 • Cadastros (P4): ${totals['SignupCompleted'] || 0}
 • Publicados (P6): ${totals['ListingPublished'] || 0}
 
-*Orgânico (Instagram):*
+ORGÂNICO (Instagram):
 • Cliques: ${instagramClicks}
 • Anúncios aprovados: ${anunciosAprovados}
 • Total ativos: ${totalAnuncios}
 
-*Anomalias:*
-${alertasTexto}
+ANOMALIAS:
+${alertasTexto}`
 
-🔗 Dashboard completo:
-${PAGES_URL}/marketing.html`
-
-  // 7. Enviar WhatsApp
-  console.log('📱 Enviando WhatsApp...')
+  // 7. Enviar email
+  console.log('📧 Enviando email...')
   try {
-    await sendWhatsApp(mensagem)
-    console.log('✅ WhatsApp enviado')
+    await sendEmail({
+      subject: `📊 Marketing Takko — ${dataGeracao}`,
+      resumo,
+      dashboardHtml: html,
+      dashboardUrl: `${PAGES_URL}/marketing.html`,
+    })
+    console.log('✅ Email enviado')
   } catch (err) {
-    console.error('Erro WhatsApp:', err.message)
+    console.error('Erro email:', err.message)
   }
 
   console.log('✅ Agente de Marketing concluído')
