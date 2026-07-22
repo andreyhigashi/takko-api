@@ -23,6 +23,9 @@ jobs:
       - name: Instalar dependências
         run: npm install
 
+      - name: Debug — verificar arquivo
+        run: grep -n "categoria\|status" agents/lib/supabase.js
+
       - name: Rodar agente de marketing
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
