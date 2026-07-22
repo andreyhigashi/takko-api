@@ -24,7 +24,9 @@ jobs:
         run: npm install
 
       - name: Debug — verificar arquivo
-        run: grep -n "categoria\|status" agents/lib/supabase.js
+        run: |
+          echo "=== supabase.js ==="
+          cat agents/lib/supabase.js
 
       - name: Rodar agente de marketing
         env:
