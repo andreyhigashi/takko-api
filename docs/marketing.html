@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dashboard Marketing — Takko Fishing</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0f172a; color: #e2e8f0; padding: 24px; }
+  h1 { font-size: 1.4rem; color: #38bdf8; margin-bottom: 4px; }
+  .sub { font-size: 0.85rem; color: #64748b; margin-bottom: 24px; }
+  .section { background: #1e293b; border-radius: 12px; padding: 20px; margin-bottom: 20px; }
+  h2 { font-size: 1rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 16px; }
+  h3 { font-size: 0.95rem; color: #38bdf8; margin: 16px 0 8px; }
+  table { width: 100%; border-collapse: collapse; font-size: 0.85rem; overflow-x: auto; display: block; }
+  th { background: #0f172a; color: #64748b; padding: 8px 12px; text-align: center; font-weight: 600; white-space: nowrap; }
+  td { padding: 8px 12px; text-align: center; border-bottom: 1px solid #0f172a; }
+  .etapa-label { text-align: left; color: #cbd5e1; white-space: nowrap; }
+  .total-col { font-weight: 700; color: #38bdf8; }
+  tr:hover td { background: #263548; }
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 8px; }
+  .card { background: #0f172a; border-radius: 8px; padding: 16px; text-align: center; }
+  .card .num { font-size: 2rem; font-weight: 700; color: #38bdf8; }
+  .card .label { font-size: 0.75rem; color: #64748b; margin-top: 4px; }
+  .anomalia { padding: 10px 14px; border-radius: 8px; margin-bottom: 8px; font-size: 0.9rem; }
+  .anomalia.hi { background: #052e16; color: #4ade80; }
+  .anomalia.danger { background: #450a0a; color: #f87171; }
+  .ok { color: #4ade80; font-size: 0.9rem; }
+  .hi { color: #4ade80; }
+  .warn { color: #fbbf24; }
+  .danger { color: #f87171; }
+  .na { color: #475569; }
+  .badge { display: inline-block; font-weight: 700; font-size: 0.8rem; padding: 2px 8px; border-radius: 4px; }
+  .badge.danger { background: #450a0a; color: #f87171; }
+  .badge.warn { background: #422006; color: #fbbf24; }
+  .badge.ok-badge { background: #052e16; color: #4ade80; }
+  .insights-box { font-size: 0.9rem; line-height: 1.7; color: #cbd5e1; }
+  .meta-nota { font-size: 0.78rem; color: #475569; margin-top: 8px; font-style: italic; }
+</style>
+</head>
+<body>
+<h1>📊 Dashboard Marketing — Takko Fishing</h1>
+<p class="sub">Gerado em 21/07/2026 às 22:28 · Últimos 7 dias</p>
+
+<div class="section">
+  <h2>Cards Rápidos</h2>
+  <div class="cards">
+    <div class="card"><div class="num">424</div><div class="label">Sessões (M3/P1)</div></div>
+    <div class="card"><div class="num">11</div><div class="label">CTA Click (P2)</div></div>
+    <div class="card"><div class="num">0</div><div class="label">Cadastros (P4)</div></div>
+    <div class="card"><div class="num">0</div><div class="label">Publicados (P6)</div></div>
+    <div class="card"><div class="num">0</div><div class="label">Cliques Instagram</div></div>
+    <div class="card"><div class="num">70</div><div class="label">Anúncios Ativos</div></div>
+  </div>
+</div>
+
+<div class="section">
+  <h2>Funil M3 → P6 · Dia a dia</h2>
+  <table>
+    <thead>
+      <tr>
+        <th style="text-align:left">Etapa</th>
+        <th>Total</th>
+        <th>15/07</th><th>16/07</th><th>17/07</th><th>18/07</th><th>19/07</th><th>20/07</th><th>21/07</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td class="etapa-label">M3 / P1 — LandingVisit</td><td class="total-col"><strong>424</strong></td><td>59</td><td>44</td><td>51</td><td>126</td><td>71</td><td>73</td><td>—</td></tr><tr><td class="etapa-label">P2 — CTA_Click</td><td class="total-col"><strong>11</strong></td><td>—</td><td>1</td><td>—</td><td>10</td><td>—</td><td>—</td><td>—</td></tr><tr><td class="etapa-label">P3 — SignupStarted</td><td class="total-col"><strong>0</strong></td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td></tr><tr><td class="etapa-label">P4 — SignupCompleted</td><td class="total-col"><strong>0</strong></td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td></tr><tr><td class="etapa-label">P5 — ListingStarted</td><td class="total-col"><strong>0</strong></td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td></tr><tr><td class="etapa-label">P6 — ListingPublished</td><td class="total-col"><strong>0</strong></td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+    </tbody>
+  </table>
+  <p class="meta-nota">M1 (Impressões) e M2 (Cliques) disponíveis apenas no Meta Ads Manager.</p>
+</div>
+
+<div class="section">
+  <h2>Tráfego Orgânico — Instagram</h2>
+  <div class="cards">
+    <div class="card"><div class="num">0</div><div class="label">Cliques via UTM instagram</div></div>
+    <div class="card"><div class="num">0</div><div class="label">Anúncios aprovados no período</div></div>
+    <div class="card"><div class="num">70</div><div class="label">Total anúncios ativos</div></div>
+  </div>
+  <p class="meta-nota">Alcance, impressões e engajamento disponíveis via Instagram Insights — integração pendente.</p>
+</div>
+
+<div class="section">
+  <h2>Anomalias Detectadas</h2>
+  <div class="anomalia hi">↑ <strong>M3 — LandingVisit</strong> subiu 31% vs primeira metade do período</div><div class="anomalia hi">↑ <strong>P1 — LandingVisit</strong> subiu 31% vs primeira metade do período</div><div class="anomalia hi">↑ <strong>P2 — CTA_Click</strong> subiu 650% vs primeira metade do período</div>
+</div>
+
+<div class="section">
+  <h2>Análise + Próximos Passos</h2>
+  <div class="insights-box">Insights não disponíveis nesta execução.</div>
+</div>
+</body>
+</html>
