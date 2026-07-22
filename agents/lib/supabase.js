@@ -44,7 +44,7 @@ async function getApprovedListings(days = 7) {
 
   const { data, error } = await supabase
     .from('anuncios')
-    .select('id, titulo, categoria, preco, created_at')
+    .select('id, titulo, preco, created_at')
     .eq('status', 'aprovado')
     .gte('created_at', since.toISOString())
     .order('created_at', { ascending: false })
