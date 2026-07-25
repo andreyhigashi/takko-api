@@ -141,13 +141,17 @@ async function dispatch(from, text, imageUrls) {
   }
 
   if (imageUrls.length > 0 && text) {
-    await processSend(from, text, imageUrls);
+    const accumulated = [...(state.imageUrls || []), ...imageUrls];
+    await processSend(from, text, accumulated);
     return;
   }
 
   if (imageUrls.length > 0 && !text) {
-    conversations.set(from, { step: 'has_photos', imageUrls });
-    await sendWhatsAppMessage(from, MSG_WAITING_INFO);
+    const accumulated = [...(state.imageUrls || []), ...imageUrls];
+    conversations.set(from, { step: 'has_photos', imageUrls: accumulated });
+    if (state.step !== 'has_photos') {
+      await sendWhatsAppMessage(from, MSG_WAITING_INFO);
+    }
     return;
   }
 
