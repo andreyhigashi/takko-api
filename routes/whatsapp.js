@@ -26,7 +26,9 @@ Posso anunciar seu equipamento de pesca de graça, sem cadastro!
 📝 Me conta o *preço* e a *cidade*
 ✅ Publicamos o anúncio por você
 
-Quando alguém se interessar, a pessoa fala direto com você pelo WhatsApp — sem intermediário e sem taxa.`;
+Quando alguém se interessar, a pessoa fala direto com você pelo WhatsApp — sem intermediário e sem taxa.
+
+💡 Mandou errado? Digite *cancelar* a qualquer momento para recomeçar.`;
 
 const MSG_WAITING_INFO = `Recebi as fotos! 📸 Agora me conta:
 • Qual é o produto? (marca/modelo se souber)
@@ -126,9 +128,78 @@ async function handleOperatorMessage(operatorFrom, text) {
   await publishListing(listingId, approval, updates, operatorFrom);
 }
 
+// ── cancelamento pelo seller ─────────────────────────────────────────────────
+async function handleCancelCommand(from, state, targetId) {
+  const whatsapp = from.replace(/\D/g, '');
+  const inProgress = ['has_photos', 'has_text', 'generating', 'waiting_price'].includes(state.step);
+
+  // "cancelar {id}" — cancela draft específico no Supabase
+  if (targetId) {
+    const { data, error } = await supabase
+      .from('anuncios')
+      .delete()
+      .eq('id', targetId)
+      .eq('whatsapp', whatsapp)
+      .eq('status', 'draft')
+      .select('id')
+      .single();
+
+    if (error || !data) {
+      await sendWhatsAppMessage(from, `Anúncio #${targetId} não encontrado ou já foi publicado.`);
+      return;
+    }
+
+    pendingApprovals.delete(targetId);
+    conversations.set(from, { step: 'new' });
+    await sendWhatsAppMessage(from, `✅ Anúncio #${targetId} cancelado.\n\nQuer anunciar outro produto? É só mandar as fotos! 📸`);
+    return;
+  }
+
+  // "cancelar" sem ID — reseta fluxo atual se houver algo em andamento
+  if (inProgress) {
+    conversations.set(from, { step: 'new' });
+    await sendWhatsAppMessage(from, `Ok, descartei tudo. Quando quiser recomeçar, é só mandar as fotos! 📸`);
+    return;
+  }
+
+  // "cancelar" sem ID — lista drafts pendentes no Supabase
+  const { data: drafts } = await supabase
+    .from('anuncios')
+    .select('id, titulo, preco, cidade')
+    .eq('whatsapp', whatsapp)
+    .eq('status', 'draft')
+    .order('id', { ascending: false })
+    .limit(5);
+
+  if (!drafts?.length) {
+    await sendWhatsAppMessage(from, `Você não tem anúncios aguardando aprovação no momento.`);
+    return;
+  }
+
+  const lista = drafts.map(d =>
+    `• *#${d.id}* — ${d.titulo ?? '?'} | R$ ${d.preco ?? '?'} | ${d.cidade ?? '?'}`
+  ).join('\n');
+
+  await sendWhatsAppMessage(from,
+    `Seus anúncios aguardando aprovação:\n\n${lista}\n\nPara cancelar um deles: *cancelar {número}*\nEx: cancelar ${drafts[0].id}`
+  );
+}
+
 // ── máquina de estado (sellers) ──────────────────────────────────────────────
 async function dispatch(from, text, imageUrls) {
   const state = conversations.get(from) || { step: 'new' };
+
+  // Comandos de cancelamento (qualquer estado)
+  if (text) {
+    const cancelMatch = text.match(/^cancelar\s*(\d+)?$/i);
+    const reset = /^(recomeçar|recomecar|errei|esquece)$/i.test(text.trim());
+
+    if (cancelMatch || reset) {
+      const targetId = cancelMatch?.[1] ? parseInt(cancelMatch[1]) : null;
+      await handleCancelCommand(from, state, targetId);
+      return;
+    }
+  }
 
   if (state.step === 'waiting_price') {
     const preco = extractPrice(text);
