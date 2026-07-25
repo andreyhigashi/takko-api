@@ -3,8 +3,9 @@ require('dotenv').config();
 const http = require('http');
 const express = require('express');
 const cors = require('cors');
-const anunciosRouter = require('./routes/anuncios');
-const uploadRouter = require('./routes/upload');
+const anunciosRouter  = require('./routes/anuncios');
+const uploadRouter    = require('./routes/upload');
+const whatsappRouter  = require('./routes/whatsapp');
 
 if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_KEY) {
   throw new Error('Configure SUPABASE_URL e SUPABASE_SERVICE_KEY no .env');
@@ -17,6 +18,7 @@ app.use(express.json());
 app.get('/health', (req, res) => res.json({ ok: true }));
 app.use('/anuncios', anunciosRouter);
 app.use('/upload', uploadRouter);
+app.use('/webhook/whatsapp', whatsappRouter);
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
