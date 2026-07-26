@@ -7,7 +7,6 @@ const { getFunnelEvents, getInstagramClicks, getApprovedListings, getTotalAnunci
 const { getDias, processFunnelByDay, calcTotals, detectAnomalias } = require('./lib/processar-funil')
 const { gerarInsightsMarketing } = require('./lib/claude')
 const { gerarHTMLMarketing } = require('./lib/gerar-html')
-const { sendEmail } = require('./lib/email')
 
 const TZ = 'America/Sao_Paulo'
 const REPO = process.env.GITHUB_REPOSITORY || 'andreyhigashi/takko-api'
@@ -86,20 +85,6 @@ ORGÂNICO (Instagram):
 
 ANOMALIAS:
 ${alertasTexto}`
-
-  // 7. Enviar email
-  console.log('📧 Enviando email...')
-  try {
-    await sendEmail({
-      subject: `📊 Marketing Takko — ${dataGeracao}`,
-      resumo,
-      dashboardHtml: html,
-      dashboardUrl: `${PAGES_URL}/marketing.html`,
-    })
-    console.log('✅ Email enviado')
-  } catch (err) {
-    console.error('Erro email:', err.message)
-  }
 
   console.log('✅ Agente de Marketing concluído')
 }
