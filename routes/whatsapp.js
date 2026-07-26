@@ -376,4 +376,14 @@ function extractPrice(text) {
   return Number.isFinite(n) && n > 0 ? Math.round(n) : null;
 }
 
+// endpoint de reset — só ativo em NODE_ENV=test (não chega em produção)
+if (process.env.NODE_ENV === 'test') {
+  router.post('/_test/reset', (req, res) => {
+    const { from } = req.body;
+    if (from) conversations.delete(from);
+    else { conversations.clear(); pendingApprovals.clear(); }
+    res.json({ cleared: true, remaining: conversations.size });
+  });
+}
+
 module.exports = router;

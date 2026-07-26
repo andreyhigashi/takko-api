@@ -3,6 +3,7 @@
 
 process.env.OPERATOR_WHATSAPP = '5599000000001';
 process.env.SITE_URL = 'https://takko-test.app';
+process.env.NODE_ENV = 'test'; // ativa endpoints de teste no router
 
 const path = require('path');
 const http = require('http');
@@ -85,6 +86,21 @@ function post(body) {
       { hostname: 'localhost', port, path: '/wh', method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Content-Length': Buffer.byteLength(data) } },
       (res) => { res.resume(); res.on('end', resolve); }
+    );
+    req.on('error', reject);
+    req.write(data);
+    req.end();
+  });
+}
+
+// simula "servidor reiniciou" — limpa o Map de conversas de um número específico
+function resetSession(from) {
+  return new Promise((resolve, reject) => {
+    const data = querystring.stringify({ from });
+    const req = http.request(
+      { hostname: 'localhost', port, path: '/wh/_test/reset', method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Content-Length': Buffer.byteLength(data) } },
+      (res) => { let body = ''; res.on('data', (c) => body += c); res.on('end', () => resolve(JSON.parse(body))); }
     );
     req.on('error', reject);
     req.write(data);
@@ -290,6 +306,39 @@ async function run() {
   await post(msgPayload(currentSeller, 'São Paulo - SP'));
   await sleep(700);
   ok(inserted.some((r) => r.data?.imagens?.length === 3 || r.table === 'anuncios'), '3 fotos salvas no draft');
+
+  // ════════════════════════════════════════════
+  // TESTE 8 — Simula reinício do servidor (perda de estado)
+  // ════════════════════════════════════════════
+  console.log('\n── T8: Simulação de reinício do servidor (perda de estado in-memory)');
+  currentSeller = '+5511000000008';
+
+  // leva o seller até waiting_price
+  await post(fotoPayload(currentSeller));
+  await sleep(300);
+  await post(msgPayload(currentSeller, 'Carretilha Daiwa BG'));
+  await sleep(100);
+  // neste ponto o seller está em waiting_price — seria a hora do Render dormir e acordar
+  // simula o reinício: limpa o estado apenas deste seller
+  const resetResult = await resetSession(currentSeller);
+  ok(resetResult.cleared === true, 'Endpoint de reset funcionou');
+
+  // seller manda o preço, mas o estado foi perdido
+  await post(msgPayload(currentSeller, '450'));
+  await sleep(100);
+  const msgAposReset = lastTo(currentSeller);
+  const gotIntro  = msgAposReset.includes('fotos');   // MSG_INTRO
+  const gotPhoto  = msgAposReset.includes('precisa');  // alguma variação
+  ok(gotIntro || (!msgAposReset.includes('cidade') && !msgAposReset.includes('Recebi tudo')),
+    `Após reinício: seller não avança (recebe orientação para recomeçar)\n     msg: "${msgAposReset.slice(0,100)}"`);
+
+  // seller manda foto → fluxo reinicia normalmente do zero
+  await post(fotoPayload(currentSeller));
+  await sleep(300);
+  ok(lastTo(currentSeller).includes('Qual é o produto'), 'Após reinício + nova foto: fluxo recomeça corretamente');
+  console.log('\n  ℹ️  Comportamento documentado: seller perde o contexto e precisa recomeçar.');
+  console.log('  ℹ️  Mitigação: keep-alive GitHub Actions (.github/workflows/keepalive.yml) impede o servidor de dormir.');
+  console.log('  ℹ️  Correção definitiva: persistir wa_sessions no Supabase (Sam H2 — pendente).\n');
 
   // ════════════════════════════════════════════
   // RESULTADO FINAL

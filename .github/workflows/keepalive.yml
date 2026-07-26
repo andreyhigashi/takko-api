@@ -1,0 +1,20 @@
+name: Keep-alive Render
+
+on:
+  schedule:
+    - cron: '*/14 * * * *'   # a cada 14 minutos — Render dorme após 15min de inatividade
+  workflow_dispatch:           # permite rodar manualmente se precisar acordar o servidor
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Takko API
+        run: |
+          STATUS=$(curl -sf -o /dev/null -w "%{http_code}" https://takko-api.onrender.com/health || echo "000")
+          echo "Status: $STATUS"
+          if [ "$STATUS" = "200" ]; then
+            echo "Servidor ativo ✅"
+          else
+            echo "Servidor respondeu com $STATUS (pode estar acordando...)"
+          fi
