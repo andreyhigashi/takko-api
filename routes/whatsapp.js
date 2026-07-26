@@ -204,6 +204,7 @@ async function dispatch(from, text, imageUrls) {
   if (state.step === 'waiting_price') {
     const preco = extractPrice(text);
     if (preco) {
+      await sendWhatsAppMessage(from, MSG_RECEIVED);
       await saveDraftAndNotify(from, { ...state.listing, preco, imagens: state.imagens });
     } else {
       await sendWhatsAppMessage(from, `Não entendi o valor. Me manda só o número, ex: *500*`);
