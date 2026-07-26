@@ -32,7 +32,12 @@ Qual é o produto?
 
 💡 Mandou errado? Digite *cancelar* para recomeçar.`;
 
-const MSG_PHOTO_ADDED = (n) => `📸 Foto adicionada! (${n} no total)\nContinue — qual é o produto?`;
+const MSG_PHOTO_ADDED = (n, step) => {
+  const hint = step === 'waiting_price' ? 'qual é o preço? 💰'
+             : step === 'waiting_city'  ? 'em qual cidade você está? 📍'
+             : 'qual é o produto?';
+  return `📸 Foto adicionada! (${n} no total)\nContinue — ${hint}`;
+};
 
 const MSG_WAITING_PRICE =
   `Qual o preço? 💰\n\n` +
@@ -202,7 +207,7 @@ async function dispatch(from, text, imageUrls) {
     if (imageUrls.length > 0) {
       const accumulated = [...(state.imageUrls || []), ...imageUrls];
       conversations.set(from, { ...state, imageUrls: accumulated });
-      await sendWhatsAppMessage(from, MSG_PHOTO_ADDED(accumulated.length));
+      await sendWhatsAppMessage(from, MSG_PHOTO_ADDED(accumulated.length, 'waiting_product'));
       return;
     }
     if (text) {
@@ -219,7 +224,7 @@ async function dispatch(from, text, imageUrls) {
     if (imageUrls.length > 0) {
       const accumulated = [...(state.imageUrls || []), ...imageUrls];
       conversations.set(from, { ...state, imageUrls: accumulated });
-      await sendWhatsAppMessage(from, MSG_PHOTO_ADDED(accumulated.length));
+      await sendWhatsAppMessage(from, MSG_PHOTO_ADDED(accumulated.length, 'waiting_price'));
       return;
     }
     if (text) {
@@ -240,7 +245,7 @@ async function dispatch(from, text, imageUrls) {
     if (imageUrls.length > 0) {
       const accumulated = [...(state.imageUrls || []), ...imageUrls];
       conversations.set(from, { ...state, imageUrls: accumulated });
-      await sendWhatsAppMessage(from, MSG_PHOTO_ADDED(accumulated.length));
+      await sendWhatsAppMessage(from, MSG_PHOTO_ADDED(accumulated.length, 'waiting_city'));
       return;
     }
     if (text) {
