@@ -82,7 +82,9 @@ async function generateListing({ text = '', imageUrls = [], twilioAuth = {} }) {
   });
 
   const raw = response.content[0].text.trim();
-  const listing = JSON.parse(raw);
+  const jsonMatch = raw.match(/\{[\s\S]*\}/);
+  if (!jsonMatch) throw new Error(`Resposta do Claude sem JSON: ${raw.slice(0, 200)}`);
+  const listing = JSON.parse(jsonMatch[0]);
   return { ...listing, imagens: storedUrls };
 }
 
