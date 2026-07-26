@@ -8,21 +8,19 @@ const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 const SYSTEM_PROMPT = `Você é um assistente que gera anúncios para a Takko Fishing, um marketplace de equipamentos de pesca usados no Brasil.
 
-Analise as imagens e/ou a descrição do vendedor e retorne um JSON com o anúncio pronto.
+O vendedor já informou o produto, o preço e a cidade. Sua tarefa é gerar apenas o título e a descrição do anúncio com base nas fotos e no nome do produto informado.
 
 Responda APENAS com JSON válido, sem markdown, sem código de bloco, sem explicação extra:
 {
-  "titulo": "Título curto e descritivo (máx 80 chars). Use: Marca + Modelo + condição, ex: Carretilha Shimano Curado DC Usada",
+  "titulo": "Título curto e atraente (máx 80 chars). Use: Marca + Modelo + condição, ex: Carretilha Shimano Curado DC Usada",
   "descricao": "Descrição em 2-3 parágrafos: produto, estado de conservação, o que está incluso no kit (se houver)",
-  "categoria": um de: "Carretilhas" | "Varas" | "Iscas" | "Acessórios" | "Outros",
-  "preco": número inteiro em reais extraído da mensagem, ou null se não mencionado,
-  "cidade": "Cidade extraída da mensagem" ou null
+  "categoria": "um de: Carretilhas | Varas | Iscas | Acessórios | Outros"
 }
 
 Regras:
-- Se a marca/modelo for visível nas fotos ou na mensagem, inclua no título
+- Use o nome do produto informado pelo vendedor como base, corrija a grafia se necessário
+- Se marca/modelo for visível nas fotos, confirme ou complemente o nome informado
 - Mencione o estado de conservação (novo/seminovo/usado/com defeito) na descrição
-- Extraia o preço da mensagem do vendedor se mencionado
 - Responda em português do Brasil`;
 
 async function downloadToSupabase(url, twilioUser, twilioPass) {
@@ -46,7 +44,7 @@ async function downloadToSupabase(url, twilioUser, twilioPass) {
   return { publicUrl: pub.publicUrl, base64: buffer.toString('base64'), mediaType: contentType };
 }
 
-async function generateListing({ text = '', imageUrls = [], twilioAuth = {} }) {
+async function generateListing({ imageUrls = [], twilioAuth = {}, produto = '', preco = null, cidade = null }) {
   const imageContents = [];
   const storedUrls = [];
 
@@ -65,9 +63,11 @@ async function generateListing({ text = '', imageUrls = [], twilioAuth = {} }) {
     }
   }
 
-  const promptText = text
-    ? `Mensagem do vendedor: "${text}"\n\nAnalise as imagens e a mensagem e gere o JSON do anúncio.`
-    : 'Analise as imagens e gere o JSON do anúncio.';
+  const promptText =
+    `Produto informado pelo vendedor: "${produto}"\n` +
+    `Preço: R$ ${preco}\n` +
+    `Cidade: ${cidade}\n\n` +
+    `Analise as imagens e gere o título e a descrição do anúncio.`;
 
   const response = await client.messages.create({
     model: 'claude-haiku-4-5-20251001',
@@ -85,7 +85,8 @@ async function generateListing({ text = '', imageUrls = [], twilioAuth = {} }) {
   const jsonMatch = raw.match(/\{[\s\S]*\}/);
   if (!jsonMatch) throw new Error(`Resposta do Claude sem JSON: ${raw.slice(0, 200)}`);
   const listing = JSON.parse(jsonMatch[0]);
-  return { ...listing, imagens: storedUrls };
+
+  return { ...listing, preco, cidade, imagens: storedUrls };
 }
 
 module.exports = { generateListing };

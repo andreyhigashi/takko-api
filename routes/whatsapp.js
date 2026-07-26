@@ -6,43 +6,51 @@ const supabase = require('../lib/supabase');
 const { generateListing }      = require('../services/listingGenerator');
 const { sendWhatsAppMessage }  = require('../services/whatsappClient');
 
-// In-memory state (MVP). Survive process restarts via Supabase if needed later.
-// key: E.164 phone string (e.g. "+5511999999999")
+// key: E.164 phone string → { step, imageUrls, produto, preco, listingId }
 const conversations = new Map();
 
-// key: listingId (number) → { sellerPhone, titulo, preco, cidade }
+// key: listingId → { sellerPhone, titulo, preco, cidade }
 const pendingApprovals = new Map();
 
 const SITE_URL        = process.env.SITE_URL || 'https://takko-catch-clean.lovable.app';
 const OPERATOR_NUMBER = (process.env.OPERATOR_WHATSAPP || '').replace(/\D/g, '');
 
-// ── mensagens seller ─────────────────────────────────────────────────────────
+// ── mensagens seller ──────────────────────────────────────────────────────────
+
 const MSG_INTRO = `Olá! 👋 Aqui é a *Takko Fishing* 🎣
 
 Posso anunciar seu equipamento de pesca de graça, sem cadastro!
 
-É simples:
-📸 Me manda as *fotos* do produto
-📝 Me conta o *preço* e a *cidade*
-✅ Publicamos o anúncio por você
+É simples: me manda as fotos e eu cuido do resto.
 
-Quando alguém se interessar, a pessoa fala direto com você pelo WhatsApp — sem intermediário e sem taxa.
+📸 Comece mandando as *fotos* do produto!`;
 
-💡 Mandou errado? Digite *cancelar* a qualquer momento para recomeçar.`;
+const MSG_WAITING_PRODUCT = `Recebi as fotos! 📸
 
-const MSG_WAITING_INFO = `Recebi as fotos! 📸 Agora me conta:
-• Qual é o produto? (marca/modelo se souber)
-• Qual o preço?
-• Em qual cidade você está?
+Qual é o produto?
+(marca e modelo, ex: *Molinete Shimano Stradic 4000*)
 
 💡 Mandou errado? Digite *cancelar* para recomeçar.`;
 
-const MSG_WAITING_PHOTOS = `Recebi a descrição! Agora manda as *fotos* do produto para eu criar o anúncio. 📸`;
+const MSG_PHOTO_ADDED = (n) => `📸 Foto adicionada! (${n} no total)\nContinue — qual é o produto?`;
 
-const MSG_WAITING_PRICE = (titulo) =>
-  `Quase lá! 🎣 Identifiquei: *${titulo}*\n\nSó falta o preço — quanto você quer cobrar? (ex: 500 ou R$500)`;
+const MSG_WAITING_PRICE =
+  `Qual o preço? 💰\n\n` +
+  `Digite *só o valor* em reais, sem R$ e sem texto:\n` +
+  `• Número inteiro → *200*\n` +
+  `• Com centavos → *199,90*\n\n` +
+  `(Vírgula ou ponto, os dois funcionam)`;
 
-const MSG_RECEIVED = `✅ Recebi tudo! Estou preparando seu anúncio — em breve estará no ar 🎣`;
+const MSG_PRICE_INVALID =
+  `Não entendi o valor. ` +
+  `Digite *só o número*, ex: *200* ou *199,90*`;
+
+const MSG_WAITING_CITY =
+  `Em qual cidade você está? 📍\n` +
+  `(ex: *São Paulo - SP*)`;
+
+const MSG_RECEIVED =
+  `✅ Recebi tudo! Estou preparando seu anúncio — em breve estará no ar 🎣`;
 
 const MSG_PUBLISHED = (titulo, preco, cidade, url) =>
   `🎉 *Seu anúncio está no ar!*\n\n` +
@@ -52,9 +60,11 @@ const MSG_PUBLISHED = (titulo, preco, cidade, url) =>
   `Quando alguém se interessar, a pessoa fala direto com você pelo WhatsApp.\n\n` +
   `🔗 ${url}`;
 
-const MSG_ERROR = `❌ Tive um problema ao criar seu anúncio. Pode tentar de novo?\nManda as fotos e a descrição outra vez.`;
+const MSG_ERROR =
+  `❌ Tive um problema ao criar seu anúncio. Pode tentar de novo?\n` +
+  `É só mandar as fotos outra vez.`;
 
-// ── webhook ──────────────────────────────────────────────────────────────────
+// ── webhook ───────────────────────────────────────────────────────────────────
 router.use(express.urlencoded({ extended: false }));
 
 router.get('/', (_req, res) => res.send('WhatsApp webhook ativo ✅'));
@@ -76,7 +86,6 @@ router.post('/', async (req, res) => {
 
     if (!from) return;
 
-    // Mensagens do operador têm fluxo separado
     const fromDigits = from.replace(/\D/g, '');
     if (OPERATOR_NUMBER && fromDigits === OPERATOR_NUMBER) {
       await handleOperatorMessage(from, text);
@@ -89,186 +98,191 @@ router.post('/', async (req, res) => {
   }
 });
 
-// ── fluxo do operador ────────────────────────────────────────────────────────
-// Formatos aceitos (case-insensitive):
-//   "{id} ok"           → publica como está
-//   "{id} preço: {val}" → corrige preço e publica
-//   "{id} cidade: {val}" → corrige cidade e publica
+// ── fluxo do operador ─────────────────────────────────────────────────────────
+// Formatos: "{id} ok" | "{id} titulo: X" | "{id} preço: X" | "{id} cidade: X"
 async function handleOperatorMessage(operatorFrom, text) {
-  const lower = text.toLowerCase().trim();
-
-  // Extrai o ID no início da mensagem
-  const idMatch = lower.match(/^(\d+)\s+(.+)$/);
+  const idMatch = text.trim().match(/^(\d+)\s+(.+)$/i);
   if (!idMatch) {
-    await sendWhatsAppMessage(operatorFrom, `Formato: *{id} ok* ou *{id} preço: 500*\n\nRascunhos pendentes: ${pendingApprovals.size}`);
+    await sendWhatsAppMessage(
+      operatorFrom,
+      `Formato aceito:\n` +
+      `*{id} ok*\n` +
+      `*{id} titulo: Novo Título*\n` +
+      `*{id} preço: 500*\n` +
+      `*{id} cidade: São Paulo*\n\n` +
+      `Rascunhos pendentes: ${pendingApprovals.size}`
+    );
     return;
   }
 
-  const listingId  = parseInt(idMatch[1], 10);
-  const command    = idMatch[2].trim();
-  const approval   = pendingApprovals.get(listingId);
+  const listingId = parseInt(idMatch[1], 10);
+  const command   = idMatch[2].trim();
+  const approval  = pendingApprovals.get(listingId);
 
   if (!approval) {
     await sendWhatsAppMessage(operatorFrom, `Rascunho #${listingId} não encontrado (pode já ter sido publicado).`);
     return;
   }
 
-  // Correções antes de publicar
   const updates = {};
-  const precoMatch = command.match(/pre[çc]o\s*:\s*([\d.,]+)/i);
+  const tituloMatch = command.match(/t[íi]tulo\s*:\s*(.+)/i);
+  const precoMatch  = command.match(/pre[çc]o\s*:\s*([\d.,]+)/i);
   const cidadeMatch = command.match(/cidade\s*:\s*(.+)/i);
 
-  if (precoMatch) updates.preco = Math.round(parseFloat(precoMatch[1].replace(/\./g, '').replace(',', '.')));
+  if (tituloMatch) updates.titulo = tituloMatch[1].trim();
+  if (precoMatch)  updates.preco  = Math.round(parseFloat(precoMatch[1].replace(/\./g, '').replace(',', '.')));
   if (cidadeMatch) updates.cidade = cidadeMatch[1].trim();
 
-  const isOk = command === 'ok' || !!precoMatch || !!cidadeMatch;
+  const isOk = command.toLowerCase() === 'ok' || !!tituloMatch || !!precoMatch || !!cidadeMatch;
   if (!isOk) {
-    await sendWhatsAppMessage(operatorFrom, `Comando não reconhecido. Use:\n*${listingId} ok*\n*${listingId} preço: 500*\n*${listingId} cidade: São Paulo*`);
+    await sendWhatsAppMessage(
+      operatorFrom,
+      `Comando não reconhecido. Use:\n` +
+      `*${listingId} ok*\n` +
+      `*${listingId} titulo: Novo Título*\n` +
+      `*${listingId} preço: 500*\n` +
+      `*${listingId} cidade: São Paulo*`
+    );
     return;
   }
 
   await publishListing(listingId, approval, updates, operatorFrom);
 }
 
-// ── cancelamento pelo seller ─────────────────────────────────────────────────
-async function handleCancelCommand(from, state, targetId) {
+// ── cancelamento pelo seller ──────────────────────────────────────────────────
+async function handleCancelCommand(from, state) {
   const whatsapp = from.replace(/\D/g, '');
-  const inProgress = ['has_photos', 'has_text', 'generating', 'waiting_price'].includes(state.step);
+  const inProgress = ['waiting_product', 'waiting_price', 'waiting_city', 'generating'].includes(state.step);
 
-  // "cancelar {id}" — cancela draft específico no Supabase
-  if (targetId) {
-    const { data, error } = await supabase
-      .from('anuncios')
-      .delete()
-      .eq('id', targetId)
-      .eq('whatsapp', whatsapp)
-      .eq('status', 'draft')
-      .select('id')
-      .single();
-
-    if (error || !data) {
-      await sendWhatsAppMessage(from, `Anúncio #${targetId} não encontrado ou já foi publicado.`);
-      return;
-    }
-
-    pendingApprovals.delete(targetId);
-    conversations.set(from, { step: 'new' });
-    await sendWhatsAppMessage(from, `✅ Anúncio #${targetId} cancelado.\n\nQuer anunciar outro produto? É só mandar as fotos! 📸`);
-    return;
-  }
-
-  // "cancelar" sem ID — reseta fluxo atual se houver algo em andamento
   if (inProgress) {
     conversations.set(from, { step: 'new' });
     await sendWhatsAppMessage(from, `Ok, descartei tudo. Quando quiser recomeçar, é só mandar as fotos! 📸`);
     return;
   }
 
-  // "cancelar" sem ID — lista drafts pendentes no Supabase
-  const { data: drafts } = await supabase
-    .from('anuncios')
-    .select('id, titulo, preco, cidade')
-    .eq('whatsapp', whatsapp)
-    .eq('status', 'draft')
-    .order('id', { ascending: false })
-    .limit(5);
+  // Se há um draft conhecido, cancela direto sem precisar do ID
+  if (state.step === 'awaiting_approval' && state.listingId) {
+    const { data, error } = await supabase
+      .from('anuncios')
+      .delete()
+      .eq('id', state.listingId)
+      .eq('whatsapp', whatsapp)
+      .eq('status', 'draft')
+      .select('id, titulo')
+      .single();
 
-  if (!drafts?.length) {
-    await sendWhatsAppMessage(from, `Você não tem anúncios aguardando aprovação no momento.`);
-    return;
-  }
-
-  const lista = drafts.map(d =>
-    `• *#${d.id}* — ${d.titulo ?? '?'} | R$ ${d.preco ?? '?'} | ${d.cidade ?? '?'}`
-  ).join('\n');
-
-  await sendWhatsAppMessage(from,
-    `Seus anúncios aguardando aprovação:\n\n${lista}\n\nPara cancelar um deles: *cancelar {número}*\nEx: cancelar ${drafts[0].id}`
-  );
-}
-
-// ── máquina de estado (sellers) ──────────────────────────────────────────────
-async function dispatch(from, text, imageUrls) {
-  const state = conversations.get(from) || { step: 'new' };
-
-  // Comandos de cancelamento (qualquer estado)
-  if (text) {
-    const cancelMatch = text.match(/^cancelar\s*(\d+)?$/i);
-    const reset = /^(recomeçar|recomecar|errei|esquece)$/i.test(text.trim());
-
-    if (cancelMatch || reset) {
-      const targetId = cancelMatch?.[1] ? parseInt(cancelMatch[1]) : null;
-      await handleCancelCommand(from, state, targetId);
+    if (!error && data) {
+      pendingApprovals.delete(state.listingId);
+      conversations.set(from, { step: 'new' });
+      await sendWhatsAppMessage(from, `✅ Anúncio cancelado.\n\nQuer anunciar outro produto? É só mandar as fotos! 📸`);
       return;
     }
   }
 
-  if (state.step === 'waiting_price') {
-    const preco = extractPrice(text);
-    if (preco) {
-      await sendWhatsAppMessage(from, MSG_RECEIVED);
-      await saveDraftAndNotify(from, { ...state.listing, preco, imagens: state.imagens });
-    } else {
-      await sendWhatsAppMessage(from, `Não entendi o valor. Me manda só o número, ex: *500*`);
-    }
-    return;
-  }
-
-  if (imageUrls.length > 0 && text) {
-    const accumulated = [...(state.imageUrls || []), ...imageUrls];
-    await processSend(from, text, accumulated);
-    return;
-  }
-
-  if (imageUrls.length > 0 && !text) {
-    const accumulated = [...(state.imageUrls || []), ...imageUrls];
-    conversations.set(from, { step: 'has_photos', imageUrls: accumulated });
-    if (state.step !== 'has_photos') {
-      await sendWhatsAppMessage(from, MSG_WAITING_INFO);
-    }
-    return;
-  }
-
-  if (text && state.step === 'has_photos' && state.imageUrls?.length) {
-    await processSend(from, text, state.imageUrls);
-    return;
-  }
-
-  if (text && !imageUrls.length) {
-    conversations.set(from, { step: 'has_text', text });
-    await sendWhatsAppMessage(from, MSG_WAITING_PHOTOS);
-    return;
-  }
-
-  await sendWhatsAppMessage(from, MSG_INTRO);
-  conversations.set(from, { step: 'intro_sent' });
+  conversations.set(from, { step: 'new' });
+  await sendWhatsAppMessage(from, `Ok! Quando quiser anunciar, é só mandar as fotos. 📸`);
 }
 
-async function processSend(from, text, imageUrls) {
-  conversations.set(from, { step: 'generating' });
-  await sendWhatsAppMessage(from, MSG_RECEIVED); // confirmação imediata ao seller
+// ── máquina de estado ─────────────────────────────────────────────────────────
+async function dispatch(from, text, imageUrls) {
+  const state = conversations.get(from) || { step: 'new' };
 
+  // Cancelar/reset — funciona em qualquer estado
+  if (text) {
+    const isCancel = /^cancelar(\s+\d+)?$/i.test(text.trim());
+    const isReset  = /^(recomeçar|recomecar|errei|esquece)$/i.test(text.trim());
+    if (isCancel || isReset) {
+      await handleCancelCommand(from, state);
+      return;
+    }
+  }
+
+  // ── waiting_product: tem fotos, aguarda nome do produto ──
+  if (state.step === 'waiting_product') {
+    if (imageUrls.length > 0) {
+      const accumulated = [...(state.imageUrls || []), ...imageUrls];
+      conversations.set(from, { ...state, imageUrls: accumulated });
+      await sendWhatsAppMessage(from, MSG_PHOTO_ADDED(accumulated.length));
+      return;
+    }
+    if (text) {
+      conversations.set(from, { step: 'waiting_price', imageUrls: state.imageUrls || [], produto: text });
+      await sendWhatsAppMessage(from, MSG_WAITING_PRICE);
+      return;
+    }
+    await sendWhatsAppMessage(from, MSG_WAITING_PRODUCT);
+    return;
+  }
+
+  // ── waiting_price: tem fotos + produto, aguarda preço ──
+  if (state.step === 'waiting_price') {
+    if (imageUrls.length > 0) {
+      const accumulated = [...(state.imageUrls || []), ...imageUrls];
+      conversations.set(from, { ...state, imageUrls: accumulated });
+      await sendWhatsAppMessage(from, MSG_PHOTO_ADDED(accumulated.length));
+      return;
+    }
+    if (text) {
+      const preco = extractPrice(text);
+      if (preco) {
+        conversations.set(from, { step: 'waiting_city', imageUrls: state.imageUrls || [], produto: state.produto, preco });
+        await sendWhatsAppMessage(from, MSG_WAITING_CITY);
+      } else {
+        await sendWhatsAppMessage(from, MSG_PRICE_INVALID);
+      }
+      return;
+    }
+    return;
+  }
+
+  // ── waiting_city: tem fotos + produto + preço, aguarda cidade ──
+  if (state.step === 'waiting_city') {
+    if (imageUrls.length > 0) {
+      const accumulated = [...(state.imageUrls || []), ...imageUrls];
+      conversations.set(from, { ...state, imageUrls: accumulated });
+      await sendWhatsAppMessage(from, MSG_PHOTO_ADDED(accumulated.length));
+      return;
+    }
+    if (text) {
+      const { imageUrls: imgs, produto, preco } = state;
+      conversations.set(from, { step: 'generating' });
+      await sendWhatsAppMessage(from, MSG_RECEIVED);
+      await processSend(from, { imageUrls: imgs || [], produto, preco, cidade: text });
+      return;
+    }
+    return;
+  }
+
+  // ── new / qualquer outro estado: precisa de foto para começar ──
+  if (imageUrls.length > 0) {
+    conversations.set(from, { step: 'waiting_product', imageUrls });
+    await sendWhatsAppMessage(from, MSG_WAITING_PRODUCT);
+    return;
+  }
+
+  // texto sem foto
+  await sendWhatsAppMessage(from, MSG_INTRO);
+  conversations.set(from, { step: 'new' });
+}
+
+async function processSend(from, { imageUrls, produto, preco, cidade }) {
   try {
     const listing = await generateListing({
-      text,
       imageUrls,
+      produto,
+      preco,
+      cidade,
       twilioAuth: {
         user: process.env.TWILIO_ACCOUNT_SID,
         pass: process.env.TWILIO_AUTH_TOKEN,
       },
     });
 
-    if (!listing.preco) {
-      conversations.set(from, { step: 'waiting_price', listing, imagens: listing.imagens });
-      await sendWhatsAppMessage(from, MSG_WAITING_PRICE(listing.titulo));
-      return;
-    }
-
     await saveDraftAndNotify(from, listing);
   } catch (err) {
     console.error('[WA processSend]', err.message);
     await sendWhatsAppMessage(from, MSG_ERROR);
-    conversations.set(from, { step: 'error' });
+    conversations.set(from, { step: 'new' });
   }
 }
 
@@ -306,7 +320,6 @@ async function saveDraftAndNotify(from, listing) {
 
   conversations.set(from, { step: 'awaiting_approval', listingId: id });
 
-  // Notifica operador
   if (OPERATOR_NUMBER) {
     await sendWhatsAppMessage(
       `+${OPERATOR_NUMBER}`,
@@ -316,7 +329,10 @@ async function saveDraftAndNotify(from, listing) {
       `📍 ${listing.cidade || '—'}\n` +
       `📱 Seller: ${from}\n\n` +
       `Para publicar: *${id} ok*\n` +
-      `Para corrigir: *${id} preço: 700* ou *${id} cidade: São Paulo*`
+      `Para corrigir:\n` +
+      `*${id} titulo: Novo Título*\n` +
+      `*${id} preço: 700*\n` +
+      `*${id} cidade: São Paulo*`
     );
   }
 
@@ -336,17 +352,12 @@ async function publishListing(listingId, approval, updates, operatorFrom) {
     return;
   }
 
+  const finalTitulo = updates.titulo ?? approval.titulo;
   const finalPreco  = updates.preco  ?? approval.preco;
   const finalCidade = updates.cidade ?? approval.cidade;
   const url = `${SITE_URL}/anuncio/${listingId}`;
 
-  // Notifica seller
-  await sendWhatsAppMessage(
-    approval.sellerPhone,
-    MSG_PUBLISHED(approval.titulo, finalPreco, finalCidade, url)
-  );
-
-  // Confirma ao operador
+  await sendWhatsAppMessage(approval.sellerPhone, MSG_PUBLISHED(finalTitulo, finalPreco, finalCidade, url));
   await sendWhatsAppMessage(operatorFrom, `✅ #${listingId} publicado!\n🔗 ${url}`);
 
   pendingApprovals.delete(listingId);
