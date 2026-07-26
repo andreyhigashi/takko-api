@@ -33,7 +33,9 @@ Quando alguém se interessar, a pessoa fala direto com você pelo WhatsApp — s
 const MSG_WAITING_INFO = `Recebi as fotos! 📸 Agora me conta:
 • Qual é o produto? (marca/modelo se souber)
 • Qual o preço?
-• Em qual cidade você está?`;
+• Em qual cidade você está?
+
+💡 Mandou errado? Digite *cancelar* para recomeçar.`;
 
 const MSG_WAITING_PHOTOS = `Recebi a descrição! Agora manda as *fotos* do produto para eu criar o anúncio. 📸`;
 
