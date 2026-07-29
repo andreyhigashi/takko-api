@@ -4,6 +4,7 @@ const cors = require('cors')
 
 const anunciosRoutes = require('./routes/anuncios')
 const adminRoutes = require('./routes/admin')
+const whatsappRoutes = require('./routes/whatsapp')
 
 const app = express()
 const PORT = process.env.PORT || 3000
@@ -43,6 +44,7 @@ app.get('/', (req, res) => {
 
 app.use('/anuncios', anunciosRoutes)
 app.use('/admin', adminRoutes)
+app.use('/webhook/whatsapp', whatsappRoutes)
 
 // ─────────────────────────────────────────
 // POST /upload
