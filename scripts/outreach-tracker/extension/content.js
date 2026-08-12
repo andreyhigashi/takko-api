@@ -91,7 +91,7 @@
       }
     }
 
-    return { seller, product, listingUrl: location.href };
+    return { seller, product, listingUrl: '' };
   }
 
   function extractListing() {
