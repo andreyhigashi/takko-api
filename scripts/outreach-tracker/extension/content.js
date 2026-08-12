@@ -66,15 +66,28 @@
       if (parts.length > 1) product = parts.slice(1).join(' · ').trim();
     }
 
-    // Seller: find first message in current chat NOT sent by "Você"
-    // aria-label pattern: "Às HH:MM, NOME: texto da mensagem"
     const chatContainer = document.querySelector('div[aria-label^="Mensagens na conversa"]');
     const scope = chatContainer || document;
+
+    // Primary: seller name from their first message
+    // aria-label: "Às HH:MM, NOME: texto" — ignora "Você:"
     for (const el of scope.querySelectorAll('div[aria-label^="Às "]')) {
       const lbl = el.getAttribute('aria-label');
       if (!lbl.includes(', Você:')) {
         const m = lbl.match(/,\s*([^:]+):/);
         if (m) { seller = m[1].trim(); break; }
+      }
+    }
+
+    // Fallback: seller profile div shown at top of chat even with no replies
+    // e.g. div[aria-label="Jefferson Alves"] inside the message container
+    if (!seller && chatContainer) {
+      for (const el of chatContainer.querySelectorAll('div[aria-label]')) {
+        const lbl = el.getAttribute('aria-label');
+        if (/^[A-ZÀ-Ú][a-zA-ZÀ-ú]+(\s[A-ZÀ-Ú][a-zA-ZÀ-ú]+)+$/.test(lbl)) {
+          seller = lbl;
+          break;
+        }
       }
     }
 
