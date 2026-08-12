@@ -1,0 +1,28 @@
+{
+  "manifest_version": 3,
+  "name": "Takko Outreach",
+  "version": "1.3",
+  "description": "Registra contatos de outreach no Supabase com 1 clique",
+  "host_permissions": [
+    "https://*.olx.com.br/*",
+    "https://facebook.com/*",
+    "https://www.facebook.com/*",
+    "https://www.messenger.com/*",
+    "https://messenger.com/*",
+    "https://azvdbthnwbhtfwffmnni.supabase.co/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "https://*.olx.com.br/*",
+        "https://www.facebook.com/marketplace/item/*",
+        "https://www.messenger.com/marketplace/t/*"
+      ],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "icons": {
+    "48": "icon.png"
+  }
+}
