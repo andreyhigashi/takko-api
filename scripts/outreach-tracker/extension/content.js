@@ -57,13 +57,20 @@
   }
 
   function extractMessenger() {
-    let seller = '', product = '';
+    let seller = '', product = '', listingUrl = '';
 
     // Product: h2 "Conversa intitulada Andrey · PRODUTO"
     const h2 = document.querySelector('h2');
     if (h2) {
       const parts = h2.textContent.trim().split(' · ');
       if (parts.length > 1) product = parts.slice(1).join(' · ').trim();
+    }
+
+    // Listing URL: extract item ID from the "See details" card at top of chat
+    const seeDetails = [...document.querySelectorAll('a')].find(a => a.textContent.trim() === 'See details');
+    if (seeDetails) {
+      const m = (seeDetails.href + '').match(/\/marketplace\/item\/(\d+)/);
+      if (m) listingUrl = 'https://www.facebook.com/marketplace/item/' + m[1] + '/';
     }
 
     const chatContainer = document.querySelector('div[aria-label^="Mensagens na conversa"]');
@@ -91,7 +98,7 @@
       }
     }
 
-    return { seller, product, listingUrl: '' };
+    return { seller, product, listingUrl };
   }
 
   function extractListing() {
