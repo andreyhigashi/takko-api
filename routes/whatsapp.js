@@ -3,8 +3,9 @@
 const express  = require('express');
 const router   = express.Router();
 const supabase = require('../lib/supabase');
-const { generateListing }      = require('../services/listingGenerator');
-const { sendWhatsAppMessage }  = require('../services/whatsappClient');
+const { generateListing }        = require('../services/listingGenerator');
+const { sendWhatsAppMessage }    = require('../services/whatsappClient');
+const { sendDraftNotification }  = require('../services/emailClient');
 
 // key: E.164 phone string → { step, imageUrls, produto, preco, listingId }
 const conversations = new Map();
@@ -326,19 +327,35 @@ async function saveDraftAndNotify(from, listing) {
   conversations.set(from, { step: 'awaiting_approval', listingId: id });
 
   if (OPERATOR_NUMBER) {
-    await sendWhatsAppMessage(
-      `+${OPERATOR_NUMBER}`,
-      `🔔 *Novo anúncio para revisar* (#${id})\n\n` +
-      `🎣 *${listing.titulo}*\n` +
-      `💰 ${precoFmt}\n` +
-      `📍 ${listing.cidade || '—'}\n` +
-      `📱 Seller: ${from}\n\n` +
-      `Para publicar: *${id} ok*\n` +
-      `Para corrigir:\n` +
-      `*${id} titulo: Novo Título*\n` +
-      `*${id} preço: 700*\n` +
-      `*${id} cidade: São Paulo*`
-    );
+    try {
+      await sendWhatsAppMessage(
+        `+${OPERATOR_NUMBER}`,
+        `🔔 *Novo anúncio para revisar* (#${id})\n\n` +
+        `🎣 *${listing.titulo}*\n` +
+        `💰 ${precoFmt}\n` +
+        `📍 ${listing.cidade || '—'}\n` +
+        `📱 Seller: ${from}\n\n` +
+        `Para publicar: *${id} ok*\n` +
+        `Para corrigir:\n` +
+        `*${id} titulo: Novo Título*\n` +
+        `*${id} preço: 700*\n` +
+        `*${id} cidade: São Paulo*`
+      );
+    } catch (waErr) {
+      console.warn('[WA concierge] notificação WA operador falhou:', waErr.message);
+    }
+  }
+
+  try {
+    await sendDraftNotification({
+      id,
+      titulo:      listing.titulo,
+      preco:       listing.preco,
+      cidade:      listing.cidade || 'Brasil',
+      sellerPhone: from,
+    });
+  } catch (emailErr) {
+    console.warn('[WA concierge] notificação email falhou:', emailErr.message);
   }
 
   console.log(`[WA concierge] rascunho criado id=${id} from=${from}`);
