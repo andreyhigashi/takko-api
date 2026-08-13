@@ -70,4 +70,54 @@ async function sendDraftNotification({ id, titulo, preco, cidade, sellerPhone })
   console.log(`[email] notificação enviada para ${OPERATOR_EMAIL} — anúncio #${id}`);
 }
 
-module.exports = { sendDraftNotification };
+async function sendSellerReply({ listingId, titulo, sellerPhone, message }) {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) return;
+
+  const html = `
+    <div style="font-family:sans-serif;max-width:480px">
+      <h2 style="color:#e67e00">💬 Resposta do seller — anúncio #${listingId}</h2>
+      <table style="border-collapse:collapse;width:100%">
+        <tr><td style="padding:6px 0;color:#888;width:80px">Anúncio</td><td><strong>${titulo}</strong></td></tr>
+        <tr><td style="padding:6px 0;color:#888">Seller</td><td>${sellerPhone}</td></tr>
+        <tr><td style="padding:6px 0;color:#888">Mensagem</td><td><strong>${message}</strong></td></tr>
+      </table>
+      <hr style="margin:20px 0;border:none;border-top:1px solid #eee">
+      <p style="color:#444;font-size:14px">Atualize o anúncio no Supabase se necessário e publique com <code>${listingId} ok</code> no bot.</p>
+    </div>
+  `;
+
+  const payload = JSON.stringify({
+    from: 'Takko Fishing <onboarding@resend.dev>',
+    to: [OPERATOR_EMAIL],
+    subject: `💬 Seller respondeu — anúncio #${listingId}`,
+    html,
+  });
+
+  await new Promise((resolve, reject) => {
+    const req = https.request({
+      hostname: 'api.resend.com',
+      path: '/emails',
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(payload),
+      },
+    }, res => {
+      let body = '';
+      res.on('data', c => body += c);
+      res.on('end', () => {
+        if (res.statusCode >= 200 && res.statusCode < 300) resolve(body);
+        else reject(new Error(`Resend HTTP ${res.statusCode}: ${body}`));
+      });
+    });
+    req.on('error', reject);
+    req.write(payload);
+    req.end();
+  });
+
+  console.log(`[email] resposta do seller encaminhada — anúncio #${listingId}`);
+}
+
+module.exports = { sendDraftNotification, sendSellerReply };

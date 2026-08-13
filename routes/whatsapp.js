@@ -3,9 +3,9 @@
 const express  = require('express');
 const router   = express.Router();
 const supabase = require('../lib/supabase');
-const { generateListing }        = require('../services/listingGenerator');
-const { sendWhatsAppMessage }    = require('../services/whatsappClient');
-const { sendDraftNotification }  = require('../services/emailClient');
+const { generateListing }                        = require('../services/listingGenerator');
+const { sendWhatsAppMessage }                    = require('../services/whatsappClient');
+const { sendDraftNotification, sendSellerReply } = require('../services/emailClient');
 
 // key: E.164 phone string → { step, imageUrls, produto, preco, listingId }
 const conversations = new Map();
@@ -257,6 +257,29 @@ async function dispatch(from, text, imageUrls) {
       return;
     }
     return;
+  }
+
+  // ── awaiting_approval: seller respondeu após o draft ser criado ──
+  if (state.step === 'awaiting_approval') {
+    const listingId = state.listingId;
+    const approval  = pendingApprovals.get(listingId);
+    const msg       = text || (imageUrls.length > 0 ? `[${imageUrls.length} foto(s)]` : null);
+    if (msg) {
+      try {
+        await sendSellerReply({
+          listingId,
+          titulo:      approval?.titulo || `#${listingId}`,
+          sellerPhone: from,
+          message:     msg,
+        });
+      } catch (e) {
+        console.warn('[WA concierge] falha ao encaminhar resposta do seller:', e.message);
+      }
+      await sendWhatsAppMessage(from,
+        `✅ Recebemos sua resposta! O operador vai revisar e atualizar seu anúncio em breve.`
+      );
+      return;
+    }
   }
 
   // ── new / qualquer outro estado: precisa de foto para começar ──
