@@ -7,6 +7,7 @@ const { generateListing }                        = require('../services/listingG
 const { sendWhatsAppMessage }                    = require('../services/whatsappClient');
 const { sendDraftNotification, sendSellerReply } = require('../services/emailClient');
 
+// ── estado em memória (cache) — persiste no Supabase ─────────────────────────
 // key: E.164 phone string → { step, imageUrls, produto, preco, listingId }
 const conversations = new Map();
 
@@ -15,6 +16,64 @@ const pendingApprovals = new Map();
 
 const SITE_URL        = process.env.SITE_URL || 'https://takko-catch-clean.lovable.app';
 const OPERATOR_NUMBER = (process.env.OPERATOR_WHATSAPP || '').replace(/\D/g, '');
+
+// ── persistência de sessão ────────────────────────────────────────────────────
+
+async function setConv(phone, state) {
+  conversations.set(phone, state);
+  try {
+    if (!state || state.step === 'new') {
+      await supabase.from('bot_sessions').delete().eq('phone', phone);
+    } else {
+      const { step, ...rest } = state;
+      await supabase.from('bot_sessions').upsert(
+        { phone, step, state_json: rest, updated_at: new Date().toISOString() },
+        { onConflict: 'phone' }
+      );
+    }
+  } catch (e) {
+    console.warn('[WA session] falha ao persistir sessão:', e.message);
+  }
+}
+
+async function restoreState() {
+  try {
+    // Restaura pendingApprovals a partir dos drafts no banco
+    const { data: drafts } = await supabase
+      .from('anuncios')
+      .select('id, titulo, preco, cidade, whatsapp')
+      .eq('status', 'draft');
+
+    if (drafts) {
+      for (const d of drafts) {
+        pendingApprovals.set(d.id, {
+          sellerPhone: `+${d.whatsapp}`,
+          titulo: d.titulo,
+          preco:  d.preco,
+          cidade: d.cidade,
+        });
+      }
+    }
+
+    // Restaura conversations a partir do bot_sessions
+    const { data: sessions } = await supabase
+      .from('bot_sessions')
+      .select('phone, step, state_json');
+
+    if (sessions) {
+      for (const s of sessions) {
+        conversations.set(s.phone, { step: s.step, ...(s.state_json || {}) });
+      }
+    }
+
+    console.log(`[WA session] restaurado — ${pendingApprovals.size} drafts, ${conversations.size} sessões`);
+  } catch (e) {
+    console.warn('[WA session] falha ao restaurar estado:', e.message);
+  }
+}
+
+// Restaura estado logo após o módulo ser carregado
+setImmediate(restoreState);
 
 // ── mensagens seller ──────────────────────────────────────────────────────────
 
@@ -51,9 +110,16 @@ const MSG_PRICE_INVALID =
   `Não entendi o valor. ` +
   `Digite *só o número*, ex: *200* ou *199,90*`;
 
+const MSG_PRICE_CONFIRM = (preco) =>
+  `Confirmando: o preço é *R$ ${Number(preco).toLocaleString('pt-BR')}*?\n\n` +
+  `Responda *sim* para confirmar ou mande o valor correto.`;
+
 const MSG_WAITING_CITY =
   `Em qual cidade você está? 📍\n` +
   `(ex: *São Paulo - SP*)`;
+
+const MSG_CITY_INVALID =
+  `Não entendi a cidade. Mande só o nome, ex: *São Paulo - SP*`;
 
 const MSG_RECEIVED =
   `✅ Recebi tudo! Estou preparando seu anúncio — em breve estará no ar 🎣`;
@@ -158,15 +224,14 @@ async function handleOperatorMessage(operatorFrom, text) {
 // ── cancelamento pelo seller ──────────────────────────────────────────────────
 async function handleCancelCommand(from, state) {
   const whatsapp = from.replace(/\D/g, '');
-  const inProgress = ['waiting_product', 'waiting_price', 'waiting_city', 'generating'].includes(state.step);
+  const inProgress = ['waiting_product', 'waiting_price', 'waiting_city', 'generating', 'confirming_price'].includes(state.step);
 
   if (inProgress) {
-    conversations.set(from, { step: 'new' });
+    await setConv(from, { step: 'new' });
     await sendWhatsAppMessage(from, `Ok, descartei tudo. Quando quiser recomeçar, é só mandar as fotos! 📸`);
     return;
   }
 
-  // Se há um draft conhecido, cancela direto sem precisar do ID
   if (state.step === 'awaiting_approval' && state.listingId) {
     const { data, error } = await supabase
       .from('anuncios')
@@ -179,13 +244,13 @@ async function handleCancelCommand(from, state) {
 
     if (!error && data) {
       pendingApprovals.delete(state.listingId);
-      conversations.set(from, { step: 'new' });
+      await setConv(from, { step: 'new' });
       await sendWhatsAppMessage(from, `✅ Anúncio cancelado.\n\nQuer anunciar outro produto? É só mandar as fotos! 📸`);
       return;
     }
   }
 
-  conversations.set(from, { step: 'new' });
+  await setConv(from, { step: 'new' });
   await sendWhatsAppMessage(from, `Ok! Quando quiser anunciar, é só mandar as fotos. 📸`);
 }
 
@@ -207,12 +272,12 @@ async function dispatch(from, text, imageUrls) {
   if (state.step === 'waiting_product') {
     if (imageUrls.length > 0) {
       const accumulated = [...(state.imageUrls || []), ...imageUrls];
-      conversations.set(from, { ...state, imageUrls: accumulated });
+      await setConv(from, { ...state, imageUrls: accumulated });
       await sendWhatsAppMessage(from, MSG_PHOTO_ADDED(accumulated.length, 'waiting_product'));
       return;
     }
     if (text) {
-      conversations.set(from, { step: 'waiting_price', imageUrls: state.imageUrls || [], produto: text });
+      await setConv(from, { step: 'waiting_price', imageUrls: state.imageUrls || [], produto: text });
       await sendWhatsAppMessage(from, MSG_WAITING_PRICE);
       return;
     }
@@ -224,17 +289,47 @@ async function dispatch(from, text, imageUrls) {
   if (state.step === 'waiting_price') {
     if (imageUrls.length > 0) {
       const accumulated = [...(state.imageUrls || []), ...imageUrls];
-      conversations.set(from, { ...state, imageUrls: accumulated });
+      await setConv(from, { ...state, imageUrls: accumulated });
       await sendWhatsAppMessage(from, MSG_PHOTO_ADDED(accumulated.length, 'waiting_price'));
       return;
     }
     if (text) {
       const preco = extractPrice(text);
       if (preco) {
-        conversations.set(from, { step: 'waiting_city', imageUrls: state.imageUrls || [], produto: state.produto, preco });
-        await sendWhatsAppMessage(from, MSG_WAITING_CITY);
+        if (preco > 2500) {
+          await setConv(from, { ...state, step: 'confirming_price', preco });
+          await sendWhatsAppMessage(from, MSG_PRICE_CONFIRM(preco));
+        } else {
+          await setConv(from, { step: 'waiting_city', imageUrls: state.imageUrls || [], produto: state.produto, preco });
+          await sendWhatsAppMessage(from, MSG_WAITING_CITY);
+        }
       } else {
         await sendWhatsAppMessage(from, MSG_PRICE_INVALID);
+      }
+      return;
+    }
+    return;
+  }
+
+  // ── confirming_price: aguarda confirmação de preço alto ──
+  if (state.step === 'confirming_price') {
+    if (text) {
+      if (/^sim$/i.test(text.trim())) {
+        await setConv(from, { step: 'waiting_city', imageUrls: state.imageUrls || [], produto: state.produto, preco: state.preco });
+        await sendWhatsAppMessage(from, MSG_WAITING_CITY);
+      } else {
+        const preco = extractPrice(text);
+        if (preco) {
+          if (preco > 2500) {
+            await setConv(from, { ...state, preco });
+            await sendWhatsAppMessage(from, MSG_PRICE_CONFIRM(preco));
+          } else {
+            await setConv(from, { step: 'waiting_city', imageUrls: state.imageUrls || [], produto: state.produto, preco });
+            await sendWhatsAppMessage(from, MSG_WAITING_CITY);
+          }
+        } else {
+          await sendWhatsAppMessage(from, MSG_PRICE_INVALID);
+        }
       }
       return;
     }
@@ -245,13 +340,17 @@ async function dispatch(from, text, imageUrls) {
   if (state.step === 'waiting_city') {
     if (imageUrls.length > 0) {
       const accumulated = [...(state.imageUrls || []), ...imageUrls];
-      conversations.set(from, { ...state, imageUrls: accumulated });
+      await setConv(from, { ...state, imageUrls: accumulated });
       await sendWhatsAppMessage(from, MSG_PHOTO_ADDED(accumulated.length, 'waiting_city'));
       return;
     }
     if (text) {
+      if (text.trim().split(/\s+/).length > 5) {
+        await sendWhatsAppMessage(from, MSG_CITY_INVALID);
+        return;
+      }
       const { imageUrls: imgs, produto, preco } = state;
-      conversations.set(from, { step: 'generating' });
+      await setConv(from, { step: 'generating' });
       await sendWhatsAppMessage(from, MSG_RECEIVED);
       await processSend(from, { imageUrls: imgs || [], produto, preco, cidade: text });
       return;
@@ -284,14 +383,14 @@ async function dispatch(from, text, imageUrls) {
 
   // ── new / qualquer outro estado: precisa de foto para começar ──
   if (imageUrls.length > 0) {
-    conversations.set(from, { step: 'waiting_product', imageUrls });
+    await setConv(from, { step: 'waiting_product', imageUrls });
     await sendWhatsAppMessage(from, MSG_WAITING_PRODUCT);
     return;
   }
 
   // texto sem foto
   await sendWhatsAppMessage(from, MSG_INTRO);
-  conversations.set(from, { step: 'new' });
+  await setConv(from, { step: 'new' });
 }
 
 async function processSend(from, { imageUrls, produto, preco, cidade }) {
@@ -311,7 +410,7 @@ async function processSend(from, { imageUrls, produto, preco, cidade }) {
   } catch (err) {
     console.error('[WA processSend]', err.message);
     await sendWhatsAppMessage(from, MSG_ERROR);
-    conversations.set(from, { step: 'new' });
+    await setConv(from, { step: 'new' });
   }
 }
 
@@ -347,7 +446,7 @@ async function saveDraftAndNotify(from, listing) {
     cidade:  listing.cidade || 'Brasil',
   });
 
-  conversations.set(from, { step: 'awaiting_approval', listingId: id });
+  await setConv(from, { step: 'awaiting_approval', listingId: id });
 
   if (OPERATOR_NUMBER) {
     try {
@@ -406,6 +505,7 @@ async function publishListing(listingId, approval, updates, operatorFrom) {
   await sendWhatsAppMessage(operatorFrom, `✅ #${listingId} publicado!\n🔗 ${url}`);
 
   pendingApprovals.delete(listingId);
+  await setConv(approval.sellerPhone, { step: 'new' });
   console.log(`[WA concierge] anúncio publicado id=${listingId}`);
 }
 
@@ -420,7 +520,7 @@ function extractPrice(text) {
 if (process.env.NODE_ENV === 'test') {
   router.post('/_test/reset', (req, res) => {
     const { from } = req.body;
-    if (from) conversations.delete(from);
+    if (from) { conversations.delete(from); }
     else { conversations.clear(); pendingApprovals.clear(); }
     res.json({ cleared: true, remaining: conversations.size });
   });
