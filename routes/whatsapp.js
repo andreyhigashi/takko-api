@@ -1,6 +1,7 @@
 'use strict';
 
 const express  = require('express');
+const crypto   = require('crypto');
 const router   = express.Router();
 const supabase = require('../lib/supabase');
 const { generateListing }                        = require('../services/listingGenerator');
@@ -75,6 +76,20 @@ async function restoreState() {
 // Restaura estado logo após o módulo ser carregado
 setImmediate(restoreState);
 
+// ── token de aprovação por email ──────────────────────────────────────────────
+function approveToken(listingId) {
+  return crypto
+    .createHmac('sha256', process.env.ADMIN_PASSWORD || 'takko')
+    .update(String(listingId))
+    .digest('hex')
+    .slice(0, 24);
+}
+
+function approveUrl(listingId) {
+  const base = process.env.API_URL || 'https://takko-api.onrender.com';
+  return `${base}/webhook/whatsapp/approve/${listingId}?token=${approveToken(listingId)}`;
+}
+
 // ── mensagens seller ──────────────────────────────────────────────────────────
 
 const MSG_INTRO = `Olá! 👋 Aqui é a *Takko Fishing* 🎣
@@ -140,6 +155,42 @@ const MSG_ERROR =
 router.use(express.urlencoded({ extended: false }));
 
 router.get('/', (_req, res) => res.send('WhatsApp webhook ativo ✅'));
+
+// ── aprovação via link do email ───────────────────────────────────────────────
+router.get('/approve/:id', async (req, res) => {
+  const listingId = parseInt(req.params.id, 10);
+  const token     = req.query.token || '';
+
+  if (token !== approveToken(listingId)) {
+    return res.status(401).send('Link inválido ou expirado.');
+  }
+
+  // Busca dados do draft no banco (funciona mesmo após restart)
+  let approval = pendingApprovals.get(listingId);
+  if (!approval) {
+    const { data } = await supabase
+      .from('anuncios')
+      .select('id, titulo, preco, cidade, whatsapp')
+      .eq('id', listingId)
+      .eq('status', 'draft')
+      .single();
+
+    if (!data) {
+      return res.send(`<p>Anúncio #${listingId} não encontrado ou já publicado.</p>`);
+    }
+    approval = { sellerPhone: `+${data.whatsapp}`, titulo: data.titulo, preco: data.preco, cidade: data.cidade };
+  }
+
+  await publishListing(listingId, approval, {}, null);
+
+  res.send(`
+    <html><body style="font-family:sans-serif;max-width:400px;margin:60px auto;text-align:center">
+      <h2 style="color:#0066cc">✅ Anúncio #${listingId} publicado!</h2>
+      <p>${approval.titulo}</p>
+      <a href="https://takko-catch-clean.lovable.app/anuncio/${listingId}" style="color:#0066cc">Ver anúncio →</a>
+    </body></html>
+  `);
+});
 
 router.post('/', async (req, res) => {
   res.set('Content-Type', 'text/xml').send('<Response></Response>');
@@ -475,6 +526,7 @@ async function saveDraftAndNotify(from, listing) {
       preco:       listing.preco,
       cidade:      listing.cidade || 'Brasil',
       sellerPhone: from,
+      approveUrl:  approveUrl(id),
     });
   } catch (emailErr) {
     console.warn('[WA concierge] notificação email falhou:', emailErr.message);
@@ -502,7 +554,7 @@ async function publishListing(listingId, approval, updates, operatorFrom) {
   const url = `${SITE_URL}/anuncio/${listingId}`;
 
   await sendWhatsAppMessage(approval.sellerPhone, MSG_PUBLISHED(finalTitulo, finalPreco, finalCidade, url));
-  await sendWhatsAppMessage(operatorFrom, `✅ #${listingId} publicado!\n🔗 ${url}`);
+  if (operatorFrom) await sendWhatsAppMessage(operatorFrom, `✅ #${listingId} publicado!\n🔗 ${url}`);
 
   pendingApprovals.delete(listingId);
   await setConv(approval.sellerPhone, { step: 'new' });

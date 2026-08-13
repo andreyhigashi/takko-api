@@ -4,7 +4,7 @@ const https = require('https');
 
 const OPERATOR_EMAIL = process.env.OPERATOR_EMAIL || 'andreyhigashi@gmail.com';
 
-async function sendDraftNotification({ id, titulo, preco, cidade, sellerPhone }) {
+async function sendDraftNotification({ id, titulo, preco, cidade, sellerPhone, approveUrl }) {
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) {
     console.warn('[email] RESEND_API_KEY não configurado — email ignorado');
@@ -23,9 +23,13 @@ async function sendDraftNotification({ id, titulo, preco, cidade, sellerPhone })
         <tr><td style="padding:6px 0;color:#888">Cidade</td><td>${cidade || '—'}</td></tr>
         <tr><td style="padding:6px 0;color:#888">Seller</td><td>${sellerPhone}</td></tr>
       </table>
+      ${approveUrl ? `
+      <div style="margin:24px 0">
+        <a href="${approveUrl}" style="display:inline-block;background:#0066cc;color:#fff;padding:12px 28px;text-decoration:none;border-radius:6px;font-weight:bold;font-size:16px">✅ Publicar agora</a>
+      </div>` : ''}
       <hr style="margin:20px 0;border:none;border-top:1px solid #eee">
-      <p style="color:#444;margin-bottom:8px">Envie para o bot WhatsApp <strong>+${botNumber}</strong>:</p>
-      <table style="border-collapse:collapse;width:100%;font-size:14px">
+      <p style="color:#444;margin-bottom:8px;font-size:13px">Ou envie para o bot WhatsApp <strong>+${botNumber}</strong>:</p>
+      <table style="border-collapse:collapse;width:100%;font-size:13px">
         <tr><td style="padding:4px 0;color:#888;width:140px">Publicar</td><td><code>${id} ok</code></td></tr>
         <tr><td style="padding:4px 0;color:#888">Corrigir título</td><td><code>${id} titulo: Novo Título</code></td></tr>
         <tr><td style="padding:4px 0;color:#888">Corrigir preço</td><td><code>${id} preço: 500</code></td></tr>
