@@ -210,7 +210,7 @@ router.post('/', async (req, res) => {
     if (!from) return;
 
     const fromDigits = from.replace(/\D/g, '');
-    if (OPERATOR_NUMBER && fromDigits === OPERATOR_NUMBER) {
+    if (OPERATOR_NUMBER && isSamePhone(fromDigits, OPERATOR_NUMBER)) {
       await handleOperatorMessage(from, text);
       return;
     }
@@ -559,6 +559,15 @@ async function publishListing(listingId, approval, updates, operatorFrom) {
   pendingApprovals.delete(listingId);
   await setConv(approval.sellerPhone, { step: 'new' });
   console.log(`[WA concierge] anúncio publicado id=${listingId}`);
+}
+
+// Compara dois números BR ignorando o 9º dígito (Twilio às vezes omite)
+function isSamePhone(a, b) {
+  if (a === b) return true;
+  const normalize = n => n.startsWith('55') && n.length === 13
+    ? n.slice(0, 4) + n.slice(5)   // remove o 9º dígito após o DDD
+    : n;
+  return normalize(a) === normalize(b);
 }
 
 function extractPrice(text) {
