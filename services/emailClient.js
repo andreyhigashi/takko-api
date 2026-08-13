@@ -1,44 +1,18 @@
 'use strict';
 
-const nodemailer = require('nodemailer');
+const https = require('https');
 
 const OPERATOR_EMAIL = process.env.OPERATOR_EMAIL || 'andreyhigashi@gmail.com';
 
-function createTransport() {
-  return nodemailer.createTransport({
-    service: 'gmail',
-    auth: {
-      user: process.env.SMTP_USER,
-      pass: process.env.SMTP_PASS,
-    },
-  });
-}
-
 async function sendDraftNotification({ id, titulo, preco, cidade, sellerPhone }) {
-  if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
-    console.warn('[email] SMTP_USER ou SMTP_PASS não configurado — email ignorado');
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) {
+    console.warn('[email] RESEND_API_KEY não configurado — email ignorado');
     return;
   }
 
   const precoFmt = `R$ ${Number(preco).toLocaleString('pt-BR')}`;
   const botNumber = (process.env.TWILIO_WHATSAPP_FROM || '').replace(/\D/g, '');
-
-  const text = [
-    `Novo anúncio aguardando aprovação (#${id})`,
-    ``,
-    `Título:  ${titulo}`,
-    `Preço:   ${precoFmt}`,
-    `Cidade:  ${cidade || '—'}`,
-    `Seller:  ${sellerPhone}`,
-    ``,
-    `── Comandos para aprovar/corrigir ──`,
-    `Mande para o bot (+${botNumber}):`,
-    ``,
-    `Publicar:        ${id} ok`,
-    `Corrigir título: ${id} titulo: Novo Título`,
-    `Corrigir preço:  ${id} preço: 500`,
-    `Corrigir cidade: ${id} cidade: São Paulo`,
-  ].join('\n');
 
   const html = `
     <div style="font-family:sans-serif;max-width:480px">
@@ -60,12 +34,37 @@ async function sendDraftNotification({ id, titulo, preco, cidade, sellerPhone })
     </div>
   `;
 
-  await createTransport().sendMail({
-    from: `Takko Fishing <${process.env.SMTP_USER}>`,
-    to: OPERATOR_EMAIL,
+  const payload = JSON.stringify({
+    from: 'Takko Fishing <onboarding@resend.dev>',
+    to: [OPERATOR_EMAIL],
     subject: `🔔 Novo anúncio para revisar (#${id}) — ${titulo}`,
-    text,
     html,
+  });
+
+  await new Promise((resolve, reject) => {
+    const req = https.request({
+      hostname: 'api.resend.com',
+      path: '/emails',
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(payload),
+      },
+    }, res => {
+      let body = '';
+      res.on('data', c => body += c);
+      res.on('end', () => {
+        if (res.statusCode >= 200 && res.statusCode < 300) {
+          resolve(body);
+        } else {
+          reject(new Error(`Resend HTTP ${res.statusCode}: ${body}`));
+        }
+      });
+    });
+    req.on('error', reject);
+    req.write(payload);
+    req.end();
   });
 
   console.log(`[email] notificação enviada para ${OPERATOR_EMAIL} — anúncio #${id}`);
