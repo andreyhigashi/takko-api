@@ -13,6 +13,21 @@ const OPERATOR = (process.env.OPERATOR_WHATSAPP || '').replace(/\D/g, '');
 
 const CANCEL_KEYWORDS = ['cancelar', 'recomeçar', 'errei', 'esquece', 'reiniciar'];
 
+const SOURCE_MAP = {
+  OLX: 'olx_outreach',
+  FBM: 'fbm_outreach',
+  FACEBOOK: 'fbm_outreach',
+  IG: 'instagram_outreach',
+  INSTAGRAM: 'instagram_outreach',
+  GRUPO: 'wa_group',
+  WA: 'wa_group',
+};
+
+function detectSource(body) {
+  const keyword = (body || '').trim().toUpperCase().split(/\s/)[0];
+  return SOURCE_MAP[keyword] || null;
+}
+
 const MSG_INTRO = `👋 Olá! Sou da *Takko Fishing* 🎣
 
 Para anunciar seu equipamento *de graça*:
@@ -62,9 +77,10 @@ async function handleSeller(phone, body, photos) {
 
   // First contact
   if (!session || session.state === 'idle') {
-    session = { state: 'collecting', photos: [], text: '' };
+    const source = detectSource(body);
+    session = { state: 'collecting', photos: [], text: '', source };
     sessions.set(phone, session);
-    await trackEvent('WA_ConversationStarted', phone);
+    await trackEvent('WA_ConversationStarted', phone, { source });
     await sendMessage(phone, MSG_INTRO);
     // If they sent content in the first message, process it too
     if (!photos.length && !body) return;
@@ -198,6 +214,7 @@ async function publishDraft(phone, session) {
       estado_uf: 'SP',
       fotos: listing.photos,
       status: 'draft',
+      source: session.source || null,
     })
     .select()
     .single();
