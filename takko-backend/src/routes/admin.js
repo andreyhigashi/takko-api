@@ -2,6 +2,7 @@ const express = require('express')
 const router = express.Router()
 const supabase = require('../supabase')
 const { gerarImagemInstagram } = require('../services/hcti')
+const { sendMessage } = require('../services/whatsappClient')
 
 // ─────────────────────────────────────────
 // Middleware de autenticação do admin
@@ -182,6 +183,24 @@ router.delete('/anuncios/:id', adminAuth, async (req, res) => {
     if (error) throw error
 
     res.json({ success: true, message: 'Anúncio removido.' })
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message })
+  }
+})
+
+// ─────────────────────────────────────────
+// POST /admin/send-whatsapp
+// Envia mensagem WhatsApp via Twilio para qualquer número
+// Body: { to: "5511999999999", body: "texto" }
+// ─────────────────────────────────────────
+router.post('/send-whatsapp', adminAuth, async (req, res) => {
+  const { to, body } = req.body
+  if (!to || !body) {
+    return res.status(400).json({ success: false, message: 'Campos obrigatórios: to, body' })
+  }
+  try {
+    await sendMessage(to, body)
+    res.json({ success: true, message: `Mensagem enviada para ${to}` })
   } catch (error) {
     res.status(500).json({ success: false, message: error.message })
   }
