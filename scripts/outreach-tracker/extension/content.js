@@ -6,8 +6,10 @@
   const isOLX       = location.hostname.includes('olx.com.br');
   const isFBM       = location.hostname.includes('facebook.com') && location.pathname.startsWith('/marketplace/item/');
   const isMessenger = location.hostname === 'www.messenger.com' && location.pathname.startsWith('/marketplace/t/');
+  const isInstagram = location.hostname === 'www.instagram.com' && location.pathname.startsWith('/direct/');
+  const isWhatsApp  = location.hostname === 'web.whatsapp.com';
 
-  if (!isChat && !isFBM && !isMessenger && !(isOLX && /\-\d{7,}/.test(location.pathname))) return;
+  if (!isChat && !isFBM && !isMessenger && !isInstagram && !isWhatsApp && !(isOLX && /\-\d{7,}/.test(location.pathname))) return;
 
   // ── Extração do DOM ────────────────────────────────────────────────────────
 
@@ -99,6 +101,34 @@
     }
 
     return { seller, product, listingUrl };
+  }
+
+  function extractInstagram() {
+    let seller = '';
+    const tries = [
+      () => document.querySelector('header h2')?.textContent,
+      () => document.querySelector('header a span')?.textContent,
+      () => document.querySelector('[class*="DirectThread"] header span')?.textContent,
+      () => document.title.replace(/\s*[|-].*$/i, '').replace('Direct', '').trim() || null,
+    ];
+    for (const fn of tries) {
+      try { const v = fn()?.trim(); if (v) { seller = v; break; } } catch (_) {}
+    }
+    return { seller, product: '', listingUrl: location.href };
+  }
+
+  function extractWhatsApp() {
+    let seller = '';
+    const tries = [
+      () => document.querySelector('[data-testid="conversation-info-header-chat-title"]')?.textContent,
+      () => document.querySelector('header span[title]')?.getAttribute('title'),
+      () => document.querySelector('header span[title]')?.textContent,
+      () => document.title.replace('WhatsApp', '').trim() || null,
+    ];
+    for (const fn of tries) {
+      try { const v = fn()?.trim(); if (v) { seller = v; break; } } catch (_) {}
+    }
+    return { seller, product: '', listingUrl: '' };
   }
 
   function extractListing() {
@@ -235,6 +265,26 @@
       .tk-angle.sel { border-color: #0066cc; background: #e8f0fe; color: #0066cc; }
       .tk-angle.sel small { color: #5a93e8; }
 
+      /* Toggle publicado */
+      .tk-pub-row {
+        display: flex; align-items: center; gap: 10px;
+        padding: 10px 12px; border-radius: 8px; margin-bottom: 12px;
+        background: #f0fdf4; border: 1.5px solid #bbf7d0; cursor: pointer;
+        font-size: 14px; font-weight: 600; color: #15803d;
+      }
+      .tk-pub-row.off { background: #fafafa; border-color: #e0e0e0; color: #888; }
+      .tk-pub-toggle {
+        width: 36px; height: 20px; border-radius: 10px; background: #e0e0e0;
+        position: relative; flex-shrink: 0; transition: background .15s;
+      }
+      .tk-pub-row:not(.off) .tk-pub-toggle { background: #22c55e; }
+      .tk-pub-toggle::after {
+        content: ''; position: absolute; top: 2px; left: 2px;
+        width: 16px; height: 16px; border-radius: 50%; background: #fff;
+        transition: left .15s;
+      }
+      .tk-pub-row:not(.off) .tk-pub-toggle::after { left: 18px; }
+
       .tk-save {
         width: 100%; padding: 13px; color: #fff; border: none; border-radius: 10px;
         font-size: 16px; font-weight: 600; cursor: pointer; font-family: inherit;
@@ -311,7 +361,7 @@
       btn.disabled = true; btn.textContent = 'Salvando...';
       try {
         await saveContact({
-          platform: isOLX || isChat ? 'olx' : 'facebook_marketplace',  // isMessenger → facebook_marketplace
+          platform: isOLX || isChat ? 'olx' : isInstagram ? 'instagram' : isWhatsApp ? 'whatsapp_group' : 'facebook_marketplace',
           seller_name: sv, product: pv,
           contact: location.href,
           listing_url: listingUrl || null,
@@ -350,6 +400,8 @@
 
     const overlay = document.createElement('div');
     overlay.className = 'tk-overlay';
+    let pubOn = contact.listing_published || false;
+
     overlay.innerHTML = `
       <div class="tk-modal">
         <h2>✏️ Editar contato</h2>
@@ -358,6 +410,11 @@
         <div class="tk-statuses">${statusBtns}</div>
 
         <hr class="tk-sep">
+
+        <div class="tk-pub-row${pubOn ? '' : ' off'}" id="tk-pub-row">
+          <div class="tk-pub-toggle"></div>
+          <span id="tk-pub-label">${pubOn ? '✅ Publicou na Takko' : 'Publicou na Takko?'}</span>
+        </div>
 
         <label class="tk-lbl">Nome do vendedor</label>
         <input class="tk-input" id="tk-e-seller" value="${esc(contact.seller_name)}" autocomplete="off">
@@ -373,6 +430,13 @@
       </div>`;
 
     let selStatus = contact.status;
+
+    overlay.querySelector('#tk-pub-row').addEventListener('click', () => {
+      pubOn = !pubOn;
+      const row = overlay.querySelector('#tk-pub-row');
+      row.classList.toggle('off', !pubOn);
+      overlay.querySelector('#tk-pub-label').textContent = pubOn ? '✅ Publicou na Takko' : 'Publicou na Takko?';
+    });
 
     overlay.querySelectorAll('.tk-sbtn').forEach(btn => {
       btn.addEventListener('click', () => {
@@ -404,6 +468,7 @@
         seller_name: sv, product: pv,
         message_angle: editAngle,
         status: selStatus,
+        listing_published: pubOn,
       };
       if (['em_andamento','negou','confirmou'].includes(selStatus) && !contact.responded) {
         patch.responded = true; patch.response_date = today;
@@ -444,7 +509,7 @@
     if (document.getElementById('tk-chip')) return;
     injectStyles();
 
-    const { seller, product, listingUrl } = isChat ? extractChat() : isMessenger ? extractMessenger() : extractListing();
+    const { seller, product, listingUrl } = isChat ? extractChat() : isMessenger ? extractMessenger() : isInstagram ? extractInstagram() : isWhatsApp ? extractWhatsApp() : extractListing();
 
     // Retry se DOM ainda não carregou o nome
     if (!seller && (attempt || 0) < 4) {
@@ -495,6 +560,26 @@
         setTimeout(() => mount(0), 1200);
       }
     }).observe(document.body, { childList: true, subtree: true });
+    setTimeout(() => mount(0), 1200);
+  } else if (isInstagram) {
+    let lastPath = location.pathname;
+    new MutationObserver(() => {
+      if (location.pathname !== lastPath) {
+        lastPath = location.pathname;
+        unmount();
+        setTimeout(() => mount(0), 900);
+      }
+    }).observe(document.body, { childList: true, subtree: true });
+    setTimeout(() => mount(0), 1200);
+  } else if (isWhatsApp) {
+    let lastTitle = document.title;
+    new MutationObserver(() => {
+      if (document.title !== lastTitle) {
+        lastTitle = document.title;
+        unmount();
+        setTimeout(() => mount(0), 600);
+      }
+    }).observe(document.head || document.documentElement, { childList: true, subtree: true });
     setTimeout(() => mount(0), 1200);
   } else {
     mount(0);
