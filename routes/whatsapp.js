@@ -457,7 +457,7 @@ async function processSend(from, { imageUrls, produto, preco, cidade }) {
       },
     });
 
-    await saveDraftAndNotify(from, listing);
+    await saveAndPublish(from, listing);
   } catch (err) {
     console.error('[WA processSend]', err.message);
     await sendWhatsAppMessage(from, MSG_ERROR);
@@ -465,7 +465,7 @@ async function processSend(from, { imageUrls, produto, preco, cidade }) {
   }
 }
 
-async function saveDraftAndNotify(from, listing) {
+async function saveAndPublish(from, listing) {
   const whatsapp = from.replace(/\D/g, '');
 
   const { data, error } = await supabase
@@ -477,7 +477,7 @@ async function saveDraftAndNotify(from, listing) {
       cidade:    listing.cidade || 'Brasil',
       whatsapp,
       imagens:   listing.imagens || [],
-      status:    'draft',
+      status:    'aprovado',
       utm_source:   'concierge_whatsapp',
       utm_medium:   'whatsapp',
       utm_campaign: 'concierge',
@@ -487,52 +487,13 @@ async function saveDraftAndNotify(from, listing) {
 
   if (error) throw error;
 
-  const id       = data.id;
-  const precoFmt = `R$ ${Number(listing.preco).toLocaleString('pt-BR')}`;
+  const id  = data.id;
+  const url = `${SITE_URL}/anuncio/${id}`;
 
-  pendingApprovals.set(id, {
-    sellerPhone: from,
-    titulo:  listing.titulo,
-    preco:   listing.preco,
-    cidade:  listing.cidade || 'Brasil',
-  });
+  await sendWhatsAppMessage(from, MSG_PUBLISHED(listing.titulo, listing.preco, listing.cidade || 'Brasil', url));
+  await setConv(from, { step: 'new' });
 
-  await setConv(from, { step: 'awaiting_approval', listingId: id });
-
-  if (OPERATOR_NUMBER) {
-    try {
-      await sendWhatsAppMessage(
-        `+${OPERATOR_NUMBER}`,
-        `🔔 *Novo anúncio para revisar* (#${id})\n\n` +
-        `🎣 *${listing.titulo}*\n` +
-        `💰 ${precoFmt}\n` +
-        `📍 ${listing.cidade || '—'}\n` +
-        `📱 Seller: ${from}\n\n` +
-        `Para publicar: *${id} ok*\n` +
-        `Para corrigir:\n` +
-        `*${id} titulo: Novo Título*\n` +
-        `*${id} preço: 700*\n` +
-        `*${id} cidade: São Paulo*`
-      );
-    } catch (waErr) {
-      console.warn('[WA concierge] notificação WA operador falhou:', waErr.message);
-    }
-  }
-
-  try {
-    await sendDraftNotification({
-      id,
-      titulo:      listing.titulo,
-      preco:       listing.preco,
-      cidade:      listing.cidade || 'Brasil',
-      sellerPhone: from,
-      approveUrl:  approveUrl(id),
-    });
-  } catch (emailErr) {
-    console.warn('[WA concierge] notificação email falhou:', emailErr.message);
-  }
-
-  console.log(`[WA concierge] rascunho criado id=${id} from=${from}`);
+  console.log(`[WA concierge] anúncio publicado diretamente id=${id} from=${from}`);
 }
 
 async function publishListing(listingId, approval, updates, operatorFrom) {
