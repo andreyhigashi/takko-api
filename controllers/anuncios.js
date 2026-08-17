@@ -8,8 +8,8 @@ async function listarAnuncios(req, res) {
     .select('*')
     .order('id', { ascending: false });
 
-  // feed público esconde vendidos; dono vê tudo
-  if (!user_id) query = query.neq('status', 'vendido');
+  // feed público mostra só aprovados; dono vê tudo
+  if (!user_id) query = query.eq('status', 'aprovado');
 
   if (busca) query = query.ilike('titulo', `%${busca}%`);
   if (cidade) query = query.ilike('cidade', `%${cidade}%`);
