@@ -145,7 +145,8 @@ const MSG_PUBLISHED = (titulo, preco, cidade, url) =>
   `💰 R$ ${Number(preco).toLocaleString('pt-BR')}\n` +
   `📍 ${cidade || '—'}\n\n` +
   `Quando alguém se interessar, a pessoa fala direto com você pelo WhatsApp.\n\n` +
-  `🔗 ${url}`;
+  `🔗 ${url}\n\n` +
+  `Aproveite e nos siga no Instagram para acompanhar novidades: @takkofishing 🎣`;
 
 const MSG_ERROR =
   `❌ Tive um problema ao criar seu anúncio. Pode tentar de novo?\n` +
