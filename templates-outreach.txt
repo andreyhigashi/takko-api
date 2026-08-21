@@ -1,0 +1,137 @@
+=========================================================
+TAKKO FISHING — Templates de Outreach
+Atualizado: 21/08/2026
+=========================================================
+
+REGRAS ANTI-BAN (aplicar em TODOS os canais)
+---------------------------------------------
+Personalizar com pelo menos 3 elementos únicos:
+  [nome]     — nome do vendedor (visível no anúncio)
+  [produto]  — marca + modelo exato ("Shimano SLX 151XG", não "carretilha")
+  [preco]    — valor pedido ("R$350")
+  [detalhe]  — observação específica ("com case", "pouco uso", "nota fiscal")
+
+Nunca copy-paste idêntico. Variar mesmo que mude só produto e preço.
+
+LIMITES DIÁRIOS SEGUROS
+------------------------
+OLX:           10/dia (máx 15) — pausar 1-2 min a cada bloco de 3
+FBM:            8/dia (máx 12) — risco maior, Meta detecta padrão cold
+Instagram DM:   5/dia (máx 8)  — conta <3 meses: 5/dia absoluto
+Grupos WA:      1 post/grupo — não repetir o mesmo grupo em 5-7 dias
+Grupos FB:      1 post/grupo, máx 2 grupos/dia com texto variado
+
+=========================================================
+ÂNGULO B — Serviço ("a gente publica pra você")
+=========================================================
+Melhor conversão: ~27% resp rate
+
+  Oi [nome]! Vi seu [produto] por R$[preço] [detalhe].
+
+  Tenho a Takko, marketplace de equipamentos de pesca usados em SP —
+  posso publicar pra você de graça, sem cadastro. Você manda as fotos
+  e preço no WhatsApp e publico em minutos.
+
+  E ainda mantenho link pro seu anúncio original no OLX/Marketplace
+  — você não perde nada, só ganha mais visibilidade.
+
+  Toparia testar?
+
+~260 char — preencher [detalhe] com: "com case", "pouco uso", "aqui no
+Marketplace", etc.
+
+=========================================================
+ÂNGULO A — Visibilidade ("seus compradores de pesca estão lá")
+=========================================================
+Conversão: ~19% resp rate
+
+  Oi [nome]! Vi seu [produto] aqui, R$[preço].
+
+  Sou da Takko, marketplace exclusivo de pesca usada em SP — o
+  comprador chega já procurando equipamento, diferente do OLX onde
+  compete com eletrônico e móvel.
+
+  Grátis anunciar. E se quiser, mantenho link pro seu OLX original
+  também — aparece nos dois lugares ao mesmo tempo.
+
+  Toparia publicar lá também?
+
+~270 char
+
+=========================================================
+ÂNGULO C — Especialização ("nicho vs. geral")
+=========================================================
+
+  Oi [nome]! Vi seu [produto] por R$[preço] [detalhe].
+
+  Lancei a Takko, marketplace 100% pesca SP — sem eletrônicos, sem
+  móveis, só equipamento. Comprador chega com intenção de compra.
+
+  Grátis, eu cadastro pra você e mantenho link pro seu OLX/Marketplace
+  original. Topa?
+
+~235 char
+
+=========================================================
+INSTAGRAM DM — Caso A: vendedor com post de venda visível
+=========================================================
+
+  Oi [nome]! Vi você vendendo [produto] aqui.
+
+  Tenho a Takko, marketplace de pesca usada em SP — posso publicar
+  de graça pra você lá também, aparece pra mais comprador buscando
+  especificamente equipamento. E mantenho link pro seu post original.
+
+  Toparia?
+
+~220 char
+
+=========================================================
+INSTAGRAM DM — Caso B: pescador ativo sem post de venda
+=========================================================
+
+  Oi [nome]! Acompanho aqui, conteúdo de pesca top.
+
+  Tenho a Takko, marketplace de equipamentos usados SP — se quiser
+  vender algo, publico de graça. Só manda foto + preço no WhatsApp
+  e entra no ar em minutos.
+
+  Toparia?
+
+~210 char
+
+=========================================================
+GRUPOS WHATSAPP — Post semanal (sábado)
+=========================================================
+Rotacionar entre as variações abaixo. Não repetir o mesmo texto
+no mesmo grupo em menos de 5-7 dias.
+
+  Opção A:
+  Pessoal, quem tiver vara, carretilha ou molinete pra vender, posso
+  publicar gratuitamente na Takko Fishing 🎣 Manda o link do seu
+  anúncio no OLX/Marketplace ou fala comigo aqui que publico hoje mesmo.
+
+  Opção B:
+  Boa tarde galera! Tem equipamento de pesca parado em casa? Publico
+  de graça no Takko Fishing pra você. Me manda o link ou as fotos
+  aqui no privado 🎣
+
+  Opção C:
+  Quem quiser vender equipamento de pesca sem complicação: publico
+  grátis no Takko Fishing. Só mandar o link do OLX ou as fotos.
+  Sem taxa, sem burocracia 🎣
+
+=========================================================
+ROTAÇÃO DE ÂNGULOS (OLX/FBM)
+=========================================================
+D1=B  D2=A  D3=C  D4=B  D5=A  D5+= ângulo dominante
+
+=========================================================
+KEYWORDS DE BUSCA (prioridade)
+=========================================================
+1. carretilha são paulo
+2. molinete pesca SP
+3. vara de pesca SP
+4. isca artificial SP
+
+Expandir para varas quando SP atingir 50 listings de carretilha.

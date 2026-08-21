@@ -17,6 +17,25 @@ app.use(cors());
 app.use(express.json());
 
 app.get('/health', (req, res) => res.json({ ok: true }));
+
+app.get('/sitemap.xml', async (req, res) => {
+  const SITE = process.env.SITE_URL || 'https://takko-catch-clean.lovable.app';
+  try {
+    const r = await fetch(
+      `${process.env.SUPABASE_URL}/rest/v1/anuncios?select=id,updated_at&status=in.(ativo,active,aprovado)&order=id.asc`,
+      { headers: { apikey: process.env.SUPABASE_SERVICE_KEY, Authorization: `Bearer ${process.env.SUPABASE_SERVICE_KEY}` } }
+    );
+    const rows = await r.json();
+    const urls = rows.map(row => {
+      const lastmod = row.updated_at ? row.updated_at.slice(0, 10) : new Date().toISOString().slice(0, 10);
+      return `  <url><loc>${SITE}/anuncio/${row.id}</loc><lastmod>${lastmod}</lastmod><changefreq>weekly</changefreq><priority>0.8</priority></url>`;
+    });
+    const xml = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n  <url><loc>${SITE}/</loc><changefreq>daily</changefreq><priority>1.0</priority></url>\n${urls.join('\n')}\n</urlset>`;
+    res.header('Content-Type', 'application/xml').send(xml);
+  } catch (err) {
+    res.status(500).send('sitemap error');
+  }
+});
 app.use('/anuncios', anunciosRouter);
 app.use('/upload', uploadRouter);
 app.use('/webhook/whatsapp', whatsappRouter);
