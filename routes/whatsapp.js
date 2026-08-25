@@ -351,9 +351,18 @@ async function dispatch(from, text, imageUrls) {
       return;
     }
     if (text === '1') {
-      await setConv(from, { step: 'new' });
+      const { data, error } = await supabase
+        .from('price_alerts')
+        .insert({ phone: from, keyword: 'carretilha', max_price: null })
+        .select('id')
+        .single();
+      if (error) {
+        await sendWhatsAppMessage(from, `❌ Não consegui criar o alerta. Tente novamente.`);
+        return;
+      }
+      await setConv(from, { step: 'awaiting_alert_price', keyword: 'carretilha', alertId: data.id });
       await sendWhatsAppMessage(from,
-        `Mande *ALERTA [produto]* para criar seu alerta 🎣\nExemplo: *ALERTA carretilha*`
+        `✅ Alerta de *carretilha* criado!\n\nQuer receber apenas alertas abaixo de um valor? Mande o preço máximo (ex: *500*) ou *pular* para receber todos.`
       );
       return;
     }
