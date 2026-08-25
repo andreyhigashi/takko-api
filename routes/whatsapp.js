@@ -362,7 +362,7 @@ async function dispatch(from, text, imageUrls) {
       }
       await setConv(from, { step: 'awaiting_alert_price', keyword: 'carretilha', alertId: data.id });
       await sendWhatsAppMessage(from,
-        `✅ Alerta de *carretilha* criado!\n\nQuer receber apenas alertas abaixo de um valor? Mande o preço máximo (ex: *500*) ou *pular* para receber todos.`
+        `✅ Alerta de *carretilha* criado!\n\nQuer receber apenas alertas abaixo de um valor? Mande o preço máximo (ex: *500*) ou *pular* para receber todos.\n\n_Para cancelar seus alertas a qualquer momento, mande *CANCELAR ALERTAS*._`
       );
       return;
     }
