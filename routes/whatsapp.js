@@ -320,6 +320,12 @@ async function dispatch(from, text, imageUrls) {
     }
   }
 
+  // ALERTA — buyer quer ser notificado quando aparecer um produto
+  if (text && /^alerta\b/i.test(text.trim())) {
+    await handlePriceAlert(from, text.trim());
+    return;
+  }
+
   // ── waiting_product: tem fotos, aguarda nome do produto ──
   if (state.step === 'waiting_product') {
     if (imageUrls.length > 0) {
@@ -494,6 +500,9 @@ async function saveAndPublish(from, listing) {
   await sendWhatsAppMessage(from, MSG_PUBLISHED(listing.titulo, listing.preco, listing.cidade || 'Brasil', url));
   await setConv(from, { step: 'new' });
 
+  // Notifica buyers com alertas que batem com o anúncio
+  await notifyPriceAlerts({ id, titulo: listing.titulo, preco: listing.preco, cidade: listing.cidade || 'Brasil' });
+
   console.log(`[WA concierge] anúncio publicado diretamente id=${id} from=${from}`);
 }
 
@@ -520,6 +529,10 @@ async function publishListing(listingId, approval, updates, operatorFrom) {
 
   pendingApprovals.delete(listingId);
   await setConv(approval.sellerPhone, { step: 'new' });
+
+  // Notifica buyers com alertas que batem com o anúncio
+  await notifyPriceAlerts({ id: listingId, titulo: finalTitulo, preco: finalPreco, cidade: finalCidade });
+
   console.log(`[WA concierge] anúncio publicado id=${listingId}`);
 }
 
@@ -537,6 +550,90 @@ function extractPrice(text) {
   if (!m) return null;
   const n = parseFloat(m[0].replace(/\./g, '').replace(',', '.'));
   return Number.isFinite(n) && n > 0 ? Math.round(n) : null;
+}
+
+// ── price alerts ─────────────────────────────────────────────────────────────
+
+// Parseia "ALERTA CARRETILHA 500" ou "ALERTA CARRETILHA"
+async function handlePriceAlert(from, text) {
+  // Remove "ALERTA" e divide o restante
+  const parts     = text.replace(/^alerta\s*/i, '').trim().split(/\s+/);
+  const lastPart  = parts[parts.length - 1];
+  const priceHint = /^\d+$/.test(lastPart) ? parseInt(lastPart, 10) : null;
+  const keyword   = priceHint !== null
+    ? parts.slice(0, -1).join(' ').toLowerCase()
+    : parts.join(' ').toLowerCase();
+
+  if (!keyword) {
+    await sendWhatsAppMessage(from,
+      `Para criar um alerta, mande: *ALERTA [produto]* ou *ALERTA [produto] [preço máximo]*\n\nExemplos:\n• ALERTA carretilha\n• ALERTA vara 300`
+    );
+    return;
+  }
+
+  const { error } = await supabase.from('price_alerts').insert({
+    phone:     from,
+    keyword,
+    max_price: priceHint,
+  });
+
+  if (error) {
+    console.error('[WA price_alert] erro ao salvar alerta:', error.message);
+    await sendWhatsAppMessage(from, `❌ Não consegui criar o alerta. Tente novamente.`);
+    return;
+  }
+
+  const priceMsg = priceHint ? ` até R$ ${priceHint.toLocaleString('pt-BR')}` : '';
+  await sendWhatsAppMessage(from,
+    `✅ Alerta criado! Vou te avisar quando aparecer *${keyword}*${priceMsg} na Takko 🎣`
+  );
+  console.log(`[WA price_alert] alerta criado phone=${from} keyword="${keyword}" max_price=${priceHint}`);
+}
+
+// Notifica buyers com alertas que batem com o anúncio recém-publicado
+async function notifyPriceAlerts({ id, titulo, preco, cidade }) {
+  try {
+    const { data: alerts, error } = await supabase
+      .from('price_alerts')
+      .select('id, phone, keyword, max_price')
+      .eq('active', true)
+      .is('notified_at', null);
+
+    if (error || !alerts || alerts.length === 0) return;
+
+    const tituloLower = (titulo || '').toLowerCase();
+    const matches     = alerts.filter(a => {
+      const keywordMatch = tituloLower.includes(a.keyword.toLowerCase());
+      const priceMatch   = a.max_price === null || preco === null || preco <= a.max_price;
+      return keywordMatch && priceMatch;
+    });
+
+    if (matches.length === 0) return;
+
+    const url = `${SITE_URL}/anuncio/${id}?utm_source=twilio&utm_medium=whatsapp&utm_campaign=price_alert`;
+    const msg = (keyword) =>
+      `🔔 Apareceu um anúncio que combina com o seu alerta!\n\n` +
+      `🎣 *${titulo}*\n` +
+      `💰 R$ ${Number(preco).toLocaleString('pt-BR')}\n` +
+      `📍 ${cidade || 'Brasil'}\n\n` +
+      `🔗 ${url}\n\n` +
+      `Fale direto com o dono pelo link.`;
+
+    await Promise.all(matches.map(async (alert) => {
+      try {
+        await sendWhatsAppMessage(alert.phone, msg(alert.keyword));
+        await supabase
+          .from('price_alerts')
+          .update({ notified_at: new Date().toISOString() })
+          .eq('id', alert.id);
+        console.log(`[WA price_alert] notificado phone=${alert.phone} keyword="${alert.keyword}" anuncio=${id}`);
+      } catch (e) {
+        console.error(`[WA price_alert] falha ao notificar phone=${alert.phone}:`, e.message);
+      }
+    }));
+  } catch (e) {
+    console.error('[WA price_alert] erro geral em notifyPriceAlerts:', e.message);
+  }
 }
 
 // endpoint de reset — só ativo em NODE_ENV=test (não chega em produção)
