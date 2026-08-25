@@ -152,6 +152,12 @@ const MSG_ERROR =
   `❌ Tive um problema ao criar seu anúncio. Pode tentar de novo?\n` +
   `É só mandar as fotos outra vez.`;
 
+const MSG_MENU =
+  `Olá! 👋 O que você quer fazer?\n\n` +
+  `*1 - Receber alertas* — te avisamos quando aparecer o equipamento que você busca\n` +
+  `*2 - Anunciar* — publique seu equipamento de graça, sem cadastro\n\n` +
+  `Responda *1* ou *2*`;
+
 // ── webhook ───────────────────────────────────────────────────────────────────
 router.use(express.urlencoded({ extended: false }));
 
@@ -310,6 +316,15 @@ async function handleCancelCommand(from, state) {
 async function dispatch(from, text, imageUrls) {
   const state = conversations.get(from) || { step: 'new' };
 
+  // Cancelar alertas — funciona em qualquer estado (verificar antes do cancelar/reset)
+  if (text && /^cancelar alertas?$/i.test(text.trim())) {
+    await supabase.from('price_alerts').update({ active: false }).eq('phone', from);
+    await sendWhatsAppMessage(from,
+      `✅ Seus alertas foram cancelados. Se quiser criar novos, mande *ALERTA [produto]*.`
+    );
+    return;
+  }
+
   // Cancelar/reset — funciona em qualquer estado
   if (text) {
     const isCancel = /^cancelar(\s+\d+)?$/i.test(text.trim());
@@ -323,6 +338,32 @@ async function dispatch(from, text, imageUrls) {
   // ALERTA — buyer quer ser notificado quando aparecer um produto
   if (text && /^alerta\b/i.test(text.trim())) {
     await handlePriceAlert(from, text.trim());
+    return;
+  }
+
+  // ── choosing_flow: buyer ou seller? ──
+  if (state.step === 'choosing_flow') {
+    if (imageUrls.length > 0) {
+      // Foto → iniciar fluxo seller diretamente
+      await setConv(from, { step: 'waiting_product', imageUrls });
+      await sendWhatsAppMessage(from, MSG_INTRO);
+      await sendWhatsAppMessage(from, MSG_WAITING_PRODUCT);
+      return;
+    }
+    if (text === '1') {
+      await setConv(from, { step: 'new' });
+      await sendWhatsAppMessage(from,
+        `Mande *ALERTA [produto]* para criar seu alerta 🎣\nExemplo: *ALERTA carretilha*`
+      );
+      return;
+    }
+    if (text === '2') {
+      await setConv(from, { step: 'new' });
+      await sendWhatsAppMessage(from, MSG_INTRO);
+      return;
+    }
+    // Qualquer outro texto → reenviar menu
+    await sendWhatsAppMessage(from, MSG_MENU);
     return;
   }
 
@@ -439,6 +480,35 @@ async function dispatch(from, text, imageUrls) {
     }
   }
 
+  // ── awaiting_alert_price: aguarda preço de corte após criar alerta ──
+  if (state.step === 'awaiting_alert_price') {
+    const { keyword, alertId } = state;
+    if (text) {
+      if (/^pular$/i.test(text.trim())) {
+        await setConv(from, { step: 'new' });
+        await sendWhatsAppMessage(from,
+          `✅ Ok! Você vai receber todos os alertas de *${keyword}* 🎣`
+        );
+        return;
+      }
+      const maxPrice = extractPrice(text);
+      if (maxPrice) {
+        await supabase.from('price_alerts').update({ max_price: maxPrice }).eq('id', alertId);
+        await setConv(from, { step: 'new' });
+        await sendWhatsAppMessage(from,
+          `✅ Configurado! Vou te avisar quando aparecer *${keyword}* até R$ ${maxPrice.toLocaleString('pt-BR')} 🎣`
+        );
+        return;
+      }
+      // Texto não reconhecido → reinstruir
+      await sendWhatsAppMessage(from,
+        `Mande o preço máximo (ex: *500*) ou *pular* para receber todos os alertas de *${keyword}*.`
+      );
+      return;
+    }
+    return;
+  }
+
   // ── new / qualquer outro estado: precisa de foto para começar ──
   if (imageUrls.length > 0) {
     await setConv(from, { step: 'waiting_product', imageUrls });
@@ -446,7 +516,14 @@ async function dispatch(from, text, imageUrls) {
     return;
   }
 
-  // texto sem foto
+  // texto sem foto em estado 'new' → menu buyer/seller
+  if (state.step === 'new' && text) {
+    await setConv(from, { step: 'choosing_flow' });
+    await sendWhatsAppMessage(from, MSG_MENU);
+    return;
+  }
+
+  // qualquer outro estado sem ação reconhecida
   await sendWhatsAppMessage(from, MSG_INTRO);
   await setConv(from, { step: 'new' });
 }
@@ -571,11 +648,11 @@ async function handlePriceAlert(from, text) {
     return;
   }
 
-  const { error } = await supabase.from('price_alerts').insert({
+  const { data: alertData, error } = await supabase.from('price_alerts').insert({
     phone:     from,
     keyword,
     max_price: priceHint,
-  });
+  }).select('id').single();
 
   if (error) {
     console.error('[WA price_alert] erro ao salvar alerta:', error.message);
@@ -583,11 +660,20 @@ async function handlePriceAlert(from, text) {
     return;
   }
 
-  const priceMsg = priceHint ? ` até R$ ${priceHint.toLocaleString('pt-BR')}` : '';
-  await sendWhatsAppMessage(from,
-    `✅ Alerta criado! Vou te avisar quando aparecer *${keyword}*${priceMsg} na Takko 🎣`
-  );
   console.log(`[WA price_alert] alerta criado phone=${from} keyword="${keyword}" max_price=${priceHint}`);
+
+  if (priceHint !== null) {
+    // Preço já fornecido inline — confirmar direto
+    await sendWhatsAppMessage(from,
+      `✅ Alerta criado! Vou te avisar quando aparecer *${keyword}* até R$ ${priceHint.toLocaleString('pt-BR')} na Takko 🎣`
+    );
+  } else {
+    // Perguntar preço de corte
+    await setConv(from, { step: 'awaiting_alert_price', keyword, alertId: alertData.id });
+    await sendWhatsAppMessage(from,
+      `✅ Alerta criado para *${keyword}*!\n\nQuer receber apenas alertas abaixo de um valor? Mande o preço máximo (ex: *500*) ou *pular* para receber todos.`
+    );
+  }
 }
 
 // Notifica buyers com alertas que batem com o anúncio recém-publicado
