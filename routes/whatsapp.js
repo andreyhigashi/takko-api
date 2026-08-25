@@ -351,16 +351,28 @@ async function dispatch(from, text, imageUrls) {
       return;
     }
     if (text === '1') {
-      const { data, error } = await supabase
+      // reusar alerta existente se já houver um ativo para evitar duplicatas
+      const { data: existing } = await supabase
         .from('price_alerts')
-        .insert({ phone: from, keyword: 'carretilha', max_price: null })
         .select('id')
-        .single();
-      if (error) {
-        await sendWhatsAppMessage(from, `❌ Não consegui criar o alerta. Tente novamente.`);
-        return;
+        .eq('phone', from)
+        .eq('keyword', 'carretilha')
+        .eq('active', true)
+        .maybeSingle();
+      let alertId = existing?.id;
+      if (!alertId) {
+        const { data, error } = await supabase
+          .from('price_alerts')
+          .insert({ phone: from, keyword: 'carretilha', max_price: null })
+          .select('id')
+          .single();
+        if (error) {
+          await sendWhatsAppMessage(from, `❌ Não consegui criar o alerta. Tente novamente.`);
+          return;
+        }
+        alertId = data.id;
       }
-      await setConv(from, { step: 'awaiting_alert_price', keyword: 'carretilha', alertId: data.id });
+      await setConv(from, { step: 'awaiting_alert_price', keyword: 'carretilha', alertId });
       await sendWhatsAppMessage(from,
         `✅ Alerta de *carretilha* criado!\n\nQuer receber apenas alertas abaixo de um valor? Mande o preço máximo (ex: *500*) ou *pular* para receber todos.\n\n_Para cancelar seus alertas a qualquer momento, mande *CANCELAR ALERTAS*._`
       );
