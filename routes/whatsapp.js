@@ -731,6 +731,19 @@ async function notifyPriceAlerts({ id, titulo, preco, cidade }) {
   }
 }
 
+// endpoint admin para testar notificação de price alerts
+router.post('/admin/test-notify', async (req, res) => {
+  if (req.headers['x-admin-password'] !== process.env.ADMIN_PASSWORD) {
+    return res.status(401).json({ error: 'Não autorizado' });
+  }
+  const { titulo, preco, cidade, id } = req.body;
+  if (!titulo || preco === undefined || !id) {
+    return res.status(400).json({ error: 'Campos obrigatórios: titulo, preco, id' });
+  }
+  await notifyPriceAlerts({ id, titulo, preco, cidade: cidade || 'Brasil' });
+  res.json({ ok: true, msg: 'notifyPriceAlerts executado' });
+});
+
 // endpoint de reset — só ativo em NODE_ENV=test (não chega em produção)
 if (process.env.NODE_ENV === 'test') {
   router.post('/_test/reset', (req, res) => {
