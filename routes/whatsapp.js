@@ -320,7 +320,7 @@ async function dispatch(from, text, imageUrls) {
   if (text && /^cancelar alertas?$/i.test(text.trim())) {
     await supabase.from('price_alerts').update({ active: false }).eq('phone', from);
     await sendWhatsAppMessage(from,
-      `✅ Seus alertas foram cancelados. Se quiser criar novos, mande *ALERTA [produto]*.`
+      `✅ Seus alertas foram cancelados. Se quiser reativar, mande *ALERTA* a qualquer momento.`
     );
     return;
   }
@@ -654,45 +654,50 @@ function extractPrice(text) {
 
 // Parseia "ALERTA CARRETILHA 500" ou "ALERTA CARRETILHA"
 async function handlePriceAlert(from, text) {
-  // Remove "ALERTA" e divide o restante
-  const parts     = text.replace(/^alerta\s*/i, '').trim().split(/\s+/);
+  const parts     = text.replace(/^alerta\s*/i, '').trim().split(/\s+/).filter(Boolean);
   const lastPart  = parts[parts.length - 1];
   const priceHint = /^\d+$/.test(lastPart) ? parseInt(lastPart, 10) : null;
-  const keyword   = priceHint !== null
+  const rawKw     = priceHint !== null
     ? parts.slice(0, -1).join(' ').toLowerCase()
     : parts.join(' ').toLowerCase();
 
-  if (!keyword) {
-    await sendWhatsAppMessage(from,
-      `Para criar um alerta, mande: *ALERTA [produto]* ou *ALERTA [produto] [preço máximo]*\n\nExemplos:\n• ALERTA carretilha\n• ALERTA vara 300`
-    );
-    return;
+  // sem produto → default carretilha
+  const keyword = rawKw || 'carretilha';
+
+  // dedup: reusar alerta ativo existente
+  const { data: existing } = await supabase
+    .from('price_alerts')
+    .select('id')
+    .eq('phone', from)
+    .eq('keyword', keyword)
+    .eq('active', true)
+    .maybeSingle();
+
+  let alertId = existing?.id;
+  if (!alertId) {
+    const { data: inserted, error } = await supabase
+      .from('price_alerts')
+      .insert({ phone: from, keyword, max_price: priceHint })
+      .select('id')
+      .single();
+    if (error) {
+      console.error('[WA price_alert] erro ao salvar alerta:', error.message);
+      await sendWhatsAppMessage(from, `❌ Não consegui criar o alerta. Tente novamente.`);
+      return;
+    }
+    alertId = inserted.id;
   }
 
-  const { data: alertData, error } = await supabase.from('price_alerts').insert({
-    phone:     from,
-    keyword,
-    max_price: priceHint,
-  }).select('id').single();
-
-  if (error) {
-    console.error('[WA price_alert] erro ao salvar alerta:', error.message);
-    await sendWhatsAppMessage(from, `❌ Não consegui criar o alerta. Tente novamente.`);
-    return;
-  }
-
-  console.log(`[WA price_alert] alerta criado phone=${from} keyword="${keyword}" max_price=${priceHint}`);
+  console.log(`[WA price_alert] alerta phone=${from} keyword="${keyword}" max_price=${priceHint} id=${alertId}`);
 
   if (priceHint !== null) {
-    // Preço já fornecido inline — confirmar direto
     await sendWhatsAppMessage(from,
       `✅ Alerta criado! Vou te avisar quando aparecer *${keyword}* até R$ ${priceHint.toLocaleString('pt-BR')} na Takko 🎣`
     );
   } else {
-    // Perguntar preço de corte
-    await setConv(from, { step: 'awaiting_alert_price', keyword, alertId: alertData.id });
+    await setConv(from, { step: 'awaiting_alert_price', keyword, alertId });
     await sendWhatsAppMessage(from,
-      `✅ Alerta criado para *${keyword}*!\n\nQuer receber apenas alertas abaixo de um valor? Mande o preço máximo (ex: *500*) ou *pular* para receber todos.`
+      `✅ Alerta de *${keyword}* criado!\n\nQuer receber apenas alertas abaixo de um valor? Mande o preço máximo (ex: *500*) ou *pular* para receber todos.\n\n_Para cancelar, mande *CANCELAR ALERTAS*._`
     );
   }
 }
