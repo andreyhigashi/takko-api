@@ -154,7 +154,7 @@ const MSG_ERROR =
 
 const MSG_MENU =
   `Olá! 👋 O que você quer fazer?\n\n` +
-  `*1 - Receber alertas* — te avisamos quando aparecer o equipamento que você busca\n` +
+  `*1 - Alerta de carretilha* — te avisamos quando aparecer uma carretilha nova na Takko\n` +
   `*2 - Anunciar* — publique seu equipamento de graça, sem cadastro\n\n` +
   `Responda *1* ou *2*`;
 
