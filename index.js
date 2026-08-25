@@ -40,6 +40,14 @@ app.use('/anuncios', anunciosRouter);
 app.use('/upload', uploadRouter);
 app.use('/webhook/whatsapp', whatsappRouter);
 
+// ── links curtos para grupos WA (/r/:id/:grupo → anuncio com UTM) ──────────────
+app.get('/r/:id/:grupo', (req, res) => {
+  const SITE = process.env.SITE_URL || 'https://takko-catch-clean.lovable.app';
+  const { id, grupo } = req.params;
+  const url = `${SITE}/anuncio/${id}?utm_source=whatsapp&utm_medium=grupo_${grupo}&utm_campaign=lista_carretilhas&utm_content=${id}`;
+  res.redirect(301, url);
+});
+
 app.post('/admin/send-whatsapp', async (req, res) => {
   if (req.headers['x-admin-password'] !== process.env.ADMIN_PASSWORD) {
     return res.status(401).json({ success: false, message: 'Não autorizado' });
