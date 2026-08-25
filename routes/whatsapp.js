@@ -508,7 +508,7 @@ async function dispatch(from, text, imageUrls) {
       if (/^pular$/i.test(text.trim())) {
         await setConv(from, { step: 'new' });
         await sendWhatsAppMessage(from,
-          `✅ Ok! Você vai receber todos os alertas de *${keyword}* 🎣`
+          `✅ Ok! Você vai receber todos os alertas de *${keyword}* 🎣\n\n_Para cancelar, mande *CANCELAR ALERTAS*._`
         );
         return;
       }
@@ -517,7 +517,7 @@ async function dispatch(from, text, imageUrls) {
         await supabase.from('price_alerts').update({ max_price: maxPrice }).eq('id', alertId);
         await setConv(from, { step: 'new' });
         await sendWhatsAppMessage(from,
-          `✅ Configurado! Vou te avisar quando aparecer *${keyword}* até R$ ${maxPrice.toLocaleString('pt-BR')} 🎣`
+          `✅ Configurado! Vou te avisar quando aparecer *${keyword}* até R$ ${maxPrice.toLocaleString('pt-BR')} 🎣\n\n_Para cancelar, mande *CANCELAR ALERTAS*._`
         );
         return;
       }
