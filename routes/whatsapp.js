@@ -593,7 +593,7 @@ async function saveAndPublish(from, listing) {
   if (error) throw error;
 
   const id  = data.id;
-  const url = `${SITE_URL}/anuncio/${id}?utm_source=twilio&utm_medium=whatsapp&utm_campaign=publicacao`;
+  const url = `${SITE_URL}/anuncio/${id}?utm_source=twilio-seller&utm_medium=whatsapp&utm_campaign=publicacao`;
 
   await sendWhatsAppMessage(from, MSG_PUBLISHED(listing.titulo, listing.preco, listing.cidade || 'Brasil', url));
   await setConv(from, { step: 'new' });
@@ -620,7 +620,7 @@ async function publishListing(listingId, approval, updates, operatorFrom) {
   const finalTitulo = updates.titulo ?? approval.titulo;
   const finalPreco  = updates.preco  ?? approval.preco;
   const finalCidade = updates.cidade ?? approval.cidade;
-  const url = `${SITE_URL}/anuncio/${listingId}?utm_source=twilio&utm_medium=whatsapp&utm_campaign=publicacao`;
+  const url = `${SITE_URL}/anuncio/${listingId}?utm_source=twilio-seller&utm_medium=whatsapp&utm_campaign=publicacao`;
 
   await sendWhatsAppMessage(approval.sellerPhone, MSG_PUBLISHED(finalTitulo, finalPreco, finalCidade, url));
   if (operatorFrom) await sendWhatsAppMessage(operatorFrom, `✅ #${listingId} publicado!\n🔗 ${url}`);
@@ -722,7 +722,7 @@ async function notifyPriceAlerts({ id, titulo, preco, cidade }) {
 
     if (matches.length === 0) return;
 
-    const url = `${SITE_URL}/anuncio/${id}?utm_source=twilio&utm_medium=whatsapp&utm_campaign=price_alert`;
+    const url = `${SITE_URL}/anuncio/${id}?utm_source=twilio-buyer&utm_medium=whatsapp&utm_campaign=price_alert`;
     const msg = (keyword) =>
       `🔔 Apareceu um anúncio que combina com o seu alerta!\n\n` +
       `🎣 *${titulo}*\n` +

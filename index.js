@@ -44,7 +44,8 @@ app.use('/webhook/whatsapp', whatsappRouter);
 app.get('/r/:id/:grupo', (req, res) => {
   const SITE = process.env.SITE_URL || 'https://takko-catch-clean.lovable.app';
   const { id, grupo } = req.params;
-  const url = `${SITE}/anuncio/${id}?utm_source=whatsapp&utm_medium=grupo_${grupo}&utm_campaign=lista_carretilhas&utm_content=${id}`;
+  console.log(`[click] id=${id} grupo=${grupo} ts=${new Date().toISOString()}`);
+  const url = `${SITE}/anuncio/${id}?utm_source=wa-grupos&utm_medium=grupo_${grupo}&utm_campaign=lista_carretilhas&utm_content=${id}`;
   res.redirect(301, url);
 });
 
