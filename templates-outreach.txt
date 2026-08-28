@@ -1,6 +1,6 @@
 =========================================================
 TAKKO FISHING — Templates de Outreach
-Atualizado: 21/08/2026
+Atualizado: 28/08/2026
 =========================================================
 
 REGRAS ANTI-BAN (aplicar em TODOS os canais)
@@ -120,6 +120,38 @@ no mesmo grupo em menos de 5-7 dias.
   Quem quiser vender equipamento de pesca sem complicação: publico
   grátis no Takko Fishing. Só mandar o link do OLX ou as fotos.
   Sem taxa, sem burocracia 🎣
+
+=========================================================
+LINKS UTM — Compartilhar no chat com seller
+=========================================================
+Usar SEMPRE que enviar o link da Takko dentro de uma conversa no chat
+(FBM, OLX, IG DM). Esses visitantes são SELLERS, não buyers — o UTM
+permite isolá-los no analytics.
+
+  FBM (Messenger):
+  https://takko-catch-clean.lovable.app/?utm_source=fbm-chat&utm_medium=chat&utm_campaign=seller-interest
+
+  OLX:
+  https://takko-catch-clean.lovable.app/?utm_source=olx-chat&utm_medium=chat&utm_campaign=seller-interest
+
+  Instagram DM:
+  https://takko-catch-clean.lovable.app/?utm_source=ig-chat&utm_medium=chat&utm_campaign=seller-interest
+
+NUNCA usar o link limpo (sem UTM) em conversas de outreach.
+
+=========================================================
+FOLLOW-UP — Seller pediu para ver a plataforma
+=========================================================
+Usar quando seller responde "o que é a Takko?" ou "pode me mostrar?".
+Substituir o [LINK] pelo link UTM correspondente ao canal acima.
+
+  Claro! É um marketplace só de pesca usada em SP — os compradores
+  chegam já procurando equipamento específico. Dá uma olhada:
+  [LINK]
+
+  Publica de graça, você só manda as fotos e eu coloco no ar. Topa?
+
+~200 char (sem link)
 
 =========================================================
 ROTAÇÃO DE ÂNGULOS (OLX/FBM)
