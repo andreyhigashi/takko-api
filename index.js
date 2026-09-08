@@ -65,6 +65,28 @@ app.post('/admin/send-whatsapp', async (req, res) => {
   }
 });
 
+app.get('/admin/twilio-messages', async (req, res) => {
+  if (req.headers['x-admin-password'] !== process.env.ADMIN_PASSWORD) {
+    return res.status(401).json({ success: false, message: 'Não autorizado' });
+  }
+  const sid  = process.env.TWILIO_ACCOUNT_SID;
+  const auth = process.env.TWILIO_AUTH_TOKEN;
+  const from = (process.env.TWILIO_WHATSAPP_FROM || '').replace(/^\+/, '');
+  const pageSize = req.query.pageSize || 50;
+  const dateSentAfter = req.query.dateSentAfter || ''; // ex: 2026-09-01
+  let url = `https://api.twilio.com/2010-04-01/Accounts/${sid}/Messages.json?To=whatsapp:%2B${from}&PageSize=${pageSize}`;
+  if (dateSentAfter) url += `&DateSent>=${dateSentAfter}`;
+  try {
+    const r = await fetch(url, {
+      headers: { Authorization: 'Basic ' + Buffer.from(`${sid}:${auth}`).toString('base64') }
+    });
+    const data = await r.json();
+    res.json(data);
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Servidor rodando na porta ${PORT}`);
